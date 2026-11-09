@@ -2,8 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="./kai-icon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kinetic Machine Canvas — 3D Architecture Builder</title>
+  <title>Kinetic Machine Canvas — 3D Architecture Builder | Kai Kleinbard</title>
+  <meta name="description" content="Kinetic Machine Canvas by Kai Kleinbard — Interactive 3D architecture builder that compiles technical specs and PDFs into non-linear interlocking 3D machines." />
+  <meta name="author" content="Kai Kleinbard" />
+
+  <!-- Open Graph / LinkedIn Featured Image Metadata -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://cre8ture.github.io/proj-machine/" />
+  <meta property="og:site_name" content="Kinetic Machine Canvas — Kai Kleinbard" />
+  <meta property="og:title" content="Kinetic Machine Canvas — 3D Architecture Builder" />
+  <meta property="og:description" content="Interactive 3D architecture builder by Kai Kleinbard. Upload a technical PDF or paste component specs to assemble and share interlocking 3D machines." />
+  <meta property="og:image" content="https://cre8ture.github.io/proj-machine/og-image.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Kinetic Machine Canvas — 3D Architecture Builder by Kai Kleinbard" />
+
+  <!-- Twitter / X Card Metadata -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Kinetic Machine Canvas — 3D Architecture Builder" />
+  <meta name="twitter:description" content="Interactive 3D architecture builder by Kai Kleinbard. Upload a technical PDF or paste component specs to assemble and share interlocking 3D machines." />
+  <meta name="twitter:image" content="https://cre8ture.github.io/proj-machine/og-image.png" />
+  <meta name="twitter:image:alt" content="Kinetic Machine Canvas — 3D Architecture Builder by Kai Kleinbard" />
+
+  <link rel="image_src" href="https://cre8ture.github.io/proj-machine/og-image.png" />
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -90,7 +114,7 @@
       cursor: grabbing;
     }
 
-    /* Minimal floating 3D tags */
+    /* Minimal floating 3D tags & Diagram Mode component cards */
     .part-tag {
       position: absolute;
       transform: translate(-50%, -100%);
@@ -105,10 +129,24 @@
       font-weight: 500;
       white-space: nowrap;
       display: inline-flex;
-      align-items: center;
-      gap: 5px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
       box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-      transition: transform 0.12s ease, border-color 0.15s ease, background-color 0.15s ease;
+      transition: transform 0.22s ease, border-color 0.15s ease, background-color 0.15s ease, width 0.28s ease, padding 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .part-tag .part-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .part-tag .diagram-type-badge,
+    .part-tag .diagram-card-body,
+    .part-tag .diagram-card-footer {
+      display: none;
     }
 
     .part-tag:hover {
@@ -123,6 +161,134 @@
       border-color: var(--border-strong);
       z-index: 40;
       box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    }
+
+    /* Diagram Mode Blueprint Grid Backdrop & SVG Schematic Layer */
+    #diagram-backdrop {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      background-image:
+        linear-gradient(to right, var(--border-hairline) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--border-hairline) 1px, transparent 1px);
+      background-size: 40px 40px;
+      z-index: 4;
+    }
+    body.diagram-mode #diagram-backdrop {
+      opacity: 0.72;
+    }
+
+    #diagram-svg-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      z-index: 12;
+    }
+    body.diagram-mode #diagram-svg-layer {
+      opacity: 1;
+    }
+
+    /* Morph 3D part pills into Schematic Component Cards with live 3D preview + text area */
+    body.diagram-mode .part-tag {
+      transform: translate(-50%, -50%);
+      width: clamp(210px, 24vw, 286px);
+      padding: 9px 11px;
+      border-radius: 5px;
+      white-space: normal;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-hairline);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+      cursor: grab;
+    }
+    body.diagram-mode .part-tag:active {
+      cursor: grabbing;
+    }
+    body.diagram-mode .part-tag:hover {
+      border-color: var(--border-strong);
+      transform: translate(-50%, -50%) translateY(-2px);
+      z-index: 38;
+    }
+    body.diagram-mode .part-tag.selected {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1.5px solid var(--border-strong);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.26);
+      z-index: 42;
+    }
+    body.diagram-mode .part-tag .diagram-type-badge {
+      display: inline-block;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 1px 4px;
+      border-radius: 2px;
+      border: 1px solid var(--border-hairline);
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    body.diagram-mode .part-tag.selected .diagram-type-badge {
+      background: var(--accent-active);
+      color: var(--accent-active-text);
+      border-color: var(--accent-active);
+    }
+    body.diagram-mode .part-tag .diagram-card-body {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin-top: 7px;
+      padding-top: 7px;
+      border-top: 1px solid var(--border-hairline);
+    }
+    body.diagram-mode .part-tag .diagram-mini-canvas {
+      width: 60px;
+      height: 60px;
+      flex-shrink: 0;
+      border-radius: 4px;
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-primary);
+      display: block;
+    }
+    body.diagram-mode .part-tag .diagram-part-notes {
+      flex: 1;
+      min-width: 0;
+      height: 60px;
+      resize: none;
+      border-radius: 4px;
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-primary);
+      color: var(--text-secondary);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 9.5px;
+      line-height: 1.38;
+      padding: 4px 6px;
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
+    }
+    body.diagram-mode .part-tag .diagram-part-notes:focus {
+      outline: none;
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+    }
+    body.diagram-mode .part-tag .diagram-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 1px dashed var(--border-hairline);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 8.5px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
     }
 
     /* Part library tile in popup */
@@ -216,9 +382,11 @@
 </head>
 <body class="h-screen w-screen overflow-hidden relative dark-polarity">
 
-  <!-- FULL-SCREEN 3D INTERLOCKING MACHINE CANVAS -->
+  <!-- FULL-SCREEN 3D INTERLOCKING MACHINE CANVAS + SCHEMATIC DIAGRAM LAYER -->
   <div id="canvas-wrapper">
     <canvas id="webgl-canvas" class="w-full h-full block"></canvas>
+    <div id="diagram-backdrop" aria-hidden="true"></div>
+    <svg id="diagram-svg-layer" aria-hidden="true"></svg>
     <div id="labels-layer" class="absolute inset-0 pointer-events-none overflow-hidden z-20"></div>
   </div>
 
@@ -242,6 +410,7 @@
 
     <!-- Right: View & Export Actions -->
     <div class="flex items-center gap-1.5 pointer-events-auto">
+      <button id="btn-diagram" class="pill-btn" title="Toggle Schematic Diagram Mode (D)">◇ DIAGRAM</button>
       <button id="btn-wireframe" class="pill-btn active" title="Toggle X-Ray Blueprint">X-RAY</button>
       <button id="btn-theme" class="pill-btn active" title="Toggle Dark / Light Mode">DARK</button>
       <button id="btn-download-html" class="pill-btn builder-ui" title="Download standalone viewer HTML">↓ DOWNLOAD</button>
@@ -249,6 +418,17 @@
       <button id="btn-help-tour" class="pill-btn builder-ui px-2" title="Show interactive guide">?</button>
     </div>
   </header>
+
+  <!-- DIAGRAM MODE STAGE BANNER (QUICK RETURN TO 3D MACHINE) -->
+  <div id="diagram-stage-banner" class="fixed top-14 left-3 z-30 hidden items-center gap-2.5 glass px-3 py-1.5 rounded shadow-md pointer-events-auto">
+    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+    <span id="diagram-topology-label" class="font-mono-tech text-[9.5px] uppercase tracking-wider" style="color: var(--text-secondary);">
+      SCHEMATIC DIAGRAM · LIVE 3D PARTS
+    </span>
+    <button id="btn-return-machine" type="button" class="pill-btn active py-0.5 px-2 text-[9px]" title="Animate back to 3D Machine (Esc)">
+      ← 3D MACHINE
+    </button>
+  </div>
 
   <!-- SINGLE-WINDOW GUIDED SPOTLIGHT TUTORIAL (FIRST VISIT IN BUILDER MODE ONLY) -->
   <div id="tutorial-window" class="builder-ui fixed z-50 hidden glass rounded-md p-4 shadow-2xl w-80 pointer-events-auto transition-all duration-200" style="border-color: var(--border-strong);">
@@ -384,13 +564,13 @@
 
     // Non-linear 2D cluster around the central `agent-core` hub (x, z coordinates)
     let machineParts = [
-      { id: 'p1', name: 'agent-core (Turn Loop ≤40)',                        type: 'gyro',     color: null, x: 0.0,  z: 0.0  },
-      { id: 'p2', name: 'Entra JWT + 409 Run Lock',                          type: 'valve',    color: null, x: -3.2, z: -1.6 },
-      { id: 'p3', name: 'tool-registry (schemars)',                          type: 'gear',     color: null, x: -2.9, z: 1.7  },
-      { id: 'p4', name: 'llm api (gemini, claude, openai, openrouter)',      type: 'turbine',  color: null, x: 0.0,  z: -3.2 },
-      { id: 'p5', name: 'embedded database + gov-sources',                   type: 'pistons',  color: null, x: 0.0,  z: 3.2  },
-      { id: 'p6', name: 'sandbox-host (Hyper-V)',                            type: 'drum',     color: null, x: 3.1,  z: -1.7 },
-      { id: 'p7', name: 'store (Postgres Seq + SSE)',                        type: 'conveyor', color: null, x: 3.2,  z: 1.6  }
+      { id: 'p1', name: 'agent-core (Turn Loop ≤40)',                   notes: 'Central turn loop (≤40 iterations) coordinating parallel tool calls and state transitions.', type: 'gyro',     color: null, x: 0.0,  z: 0.0  },
+      { id: 'p2', name: 'Entra JWT + 409 Run Lock',                     notes: 'Validates Entra ID JWT tokens and enforces single-active-run lock (HTTP 409 if busy).',   type: 'valve',    color: null, x: -3.2, z: -1.6 },
+      { id: 'p3', name: 'tool-registry (schemars)',                     notes: 'Compile-time JSON Schema generation via schemars for type-safe agent tool invocation.',     type: 'gear',     color: null, x: -2.9, z: 1.7  },
+      { id: 'p4', name: 'llm api (gemini, claude, openai, openrouter)', notes: 'Unified streaming multi-provider LLM router across Gemini, Claude, OpenAI, and OpenRouter.', type: 'turbine',  color: null, x: 0.0,  z: -3.2 },
+      { id: 'p5', name: 'embedded database + gov-sources',              notes: 'Postgres full-text search index over embedded domain records and government sources.',       type: 'pistons',  color: null, x: 0.0,  z: 3.2  },
+      { id: 'p6', name: 'sandbox-host (Hyper-V)',                       notes: 'Isolated Hyper-V container runtime executing untrusted code and tool workloads safely.',     type: 'drum',     color: null, x: 3.1,  z: -1.7 },
+      { id: 'p7', name: 'store (Postgres Seq + SSE)',                   notes: 'Gapless sequence event store streaming live execution updates over Server-Sent Events.',     type: 'conveyor', color: null, x: 3.2,  z: 1.6  }
     ];
 
     // Computes a 2D non-linear cluster layout for any list of parts lacking explicit (x,z)
@@ -418,6 +598,10 @@
     let isWireframe = true;
     let isDarkPolarity = true;
     let isViewerOnly = false;
+    let isDiagramMode = false;
+    let diagramTransition = 0; // 0 = 3D Machine, 1 = 2D Schematic Diagram
+    let diagramEdges = [];
+    let savedMachineOrbit = { theta: 0.45, phi: 0.88, radius: 14.5 };
 
     /**
      * ============================================================================
@@ -477,7 +661,8 @@
               type: item[1],
               color: item[2] || null,
               x: typeof item[3] === 'number' ? item[3] : 0,
-              z: typeof item[4] === 'number' ? item[4] : 0
+              z: typeof item[4] === 'number' ? item[4] : 0,
+              notes: item[5] || ''
             }));
             isDarkPolarity = decoded.d !== undefined ? decoded.d === 1 : true;
             isWireframe = decoded.x !== undefined ? decoded.x === 1 : true;
@@ -501,6 +686,11 @@
      */
     const canvas = document.getElementById('webgl-canvas');
     const labelsLayer = document.getElementById('labels-layer');
+    const diagramSvgLayer = document.getElementById('diagram-svg-layer');
+    const diagramStageBanner = document.getElementById('diagram-stage-banner');
+    const diagramTopologyLabel = document.getElementById('diagram-topology-label');
+    const btnDiagram = document.getElementById('btn-diagram');
+    const btnReturnMachine = document.getElementById('btn-return-machine');
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0d0d0c);
@@ -528,6 +718,25 @@
     backLight.position.set(-14, 10, -12);
     scene.add(backLight);
 
+    // Offscreen Miniature 3D Renderer for Live Moving 3D Components inside Diagram Cards
+    const miniScene = new THREE.Scene();
+    const miniCamera = new THREE.PerspectiveCamera(34, 1, 0.1, 40);
+    miniCamera.position.set(2.55, 1.85, 2.95);
+    miniCamera.lookAt(0, 0.05, 0);
+
+    const miniRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    miniRenderer.setSize(128, 128);
+    miniRenderer.setPixelRatio(1);
+
+    const miniAmbient = new THREE.AmbientLight(0xffffff, 0.85);
+    miniScene.add(miniAmbient);
+    const miniDir = new THREE.DirectionalLight(0xffffff, 0.88);
+    miniDir.position.set(6, 10, 8);
+    miniScene.add(miniDir);
+
+    const miniRoot = new THREE.Group();
+    miniScene.add(miniRoot);
+
     // Invisible Raycast Floor Plane for clicking empty grid locations & dragging parts
     const floorHitPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(120, 120),
@@ -546,10 +755,20 @@
       const c2 = isDarkPolarity ? 0x1a1a18 : 0xe3e1da;
       const grid = new THREE.GridHelper(64, 64, c1, c2);
       grid.position.y = -1.35;
+      const machineAlpha = Math.max(0, 1 - diagramTransition);
+      if (Array.isArray(grid.material)) {
+        grid.material.forEach(m => {
+          m.transparent = true;
+          m.opacity = machineAlpha;
+        });
+      } else if (grid.material) {
+        grid.material.transparent = true;
+        grid.material.opacity = machineAlpha;
+      }
       floorGroup.add(grid);
     }
 
-    function createPartMaterials(customHex, isSelected) {
+    function createPartMaterials(customHex, isSelected, forceFullOpacity = false) {
       let primaryHex, secondaryHex, edgeHex;
       if (customHex) {
         const base = new THREE.Color(customHex);
@@ -568,12 +787,18 @@
         }
       }
 
+      const alpha = forceFullOpacity ? 1.0 : Math.max(0, 1 - diagramTransition);
+      const baseEdgeOpacity = isSelected ? 0.96 : (isWireframe ? 0.85 : 0.55);
+
       return {
         primary: new THREE.MeshStandardMaterial({
           color: primaryHex,
           roughness: 0.42,
           metalness: 0.35,
           wireframe: isWireframe,
+          transparent: true,
+          opacity: alpha,
+          depthWrite: alpha > 0.18,
           polygonOffset: true,
           polygonOffsetFactor: 1,
           polygonOffsetUnits: 1
@@ -582,14 +807,46 @@
           color: secondaryHex,
           roughness: 0.55,
           metalness: 0.45,
-          wireframe: isWireframe
+          wireframe: isWireframe,
+          transparent: true,
+          opacity: alpha,
+          depthWrite: alpha > 0.18
         }),
         edge: new THREE.LineBasicMaterial({
           color: edgeHex,
           transparent: true,
-          opacity: isSelected ? 0.96 : (isWireframe ? 0.85 : 0.55)
+          opacity: baseEdgeOpacity * alpha,
+           userData: { baseEdgeOpacity }
         })
       };
+    }
+
+    function updateSceneMachineOpacity(alpha) {
+      const a = Math.max(0, Math.min(1, alpha));
+      machineRoot.traverse((obj) => {
+        if (obj.material && obj !== floorHitPlane && (!obj.userData || obj.userData.partIndex === undefined)) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach((m) => {
+            m.transparent = true;
+            if (obj.isLineSegments) {
+              const baseOp = (m.userData && m.userData.baseEdgeOpacity) ? m.userData.baseEdgeOpacity : (isWireframe ? 0.85 : 0.55);
+              m.opacity = baseOp * a;
+            } else {
+              m.opacity = a;
+              m.depthWrite = a > 0.18;
+            }
+          });
+        }
+      });
+      floorGroup.traverse((obj) => {
+        if (obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach((m) => {
+            m.transparent = true;
+            m.opacity = a;
+          });
+        }
+      });
     }
 
     function makeMesh(geo, mat, edgeMat, parent) {
@@ -784,9 +1041,116 @@
     let activeAnimators = [];
     let partNodes = []; // { index, group, hitMesh, labelEl }
 
+    function buildDiagramSvgConnections(primaryEdges, secondaryEdges) {
+      if (!diagramSvgLayer) return;
+      diagramSvgLayer.innerHTML = '';
+      diagramEdges = [];
+
+      if (diagramTopologyLabel) {
+        diagramTopologyLabel.textContent = `${machineParts.length} COMPONENTS · LIVE 3D SCHEMATIC`;
+      }
+
+      const ns = 'http://www.w3.org/2000/svg';
+      const defs = document.createElementNS(ns, 'defs');
+      defs.innerHTML = `
+        <marker id="km-arrow-primary" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="var(--text-primary)" />
+        </marker>
+        <marker id="km-arrow-muted" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M 0 2 L 7.5 5 L 0 8 z" fill="var(--text-muted)" />
+        </marker>
+      `;
+      diagramSvgLayer.appendChild(defs);
+
+      const allConns = [
+        ...primaryEdges.map(([from, to]) => ({ from, to, primary: true, label: `0${from + 1} → 0${to + 1}` })),
+        ...secondaryEdges.map(([from, to]) => ({ from, to, primary: false, label: `0${from + 1} ↔ 0${to + 1}` }))
+      ];
+
+      allConns.forEach((conn, cIdx) => {
+        const g = document.createElementNS(ns, 'g');
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', conn.primary ? 'var(--text-primary)' : 'var(--text-muted)');
+        path.setAttribute('stroke-width', conn.primary ? '1.45' : '1.1');
+        if (!conn.primary) {
+          path.setAttribute('stroke-dasharray', '4 4');
+        }
+        path.setAttribute('marker-end', conn.primary ? 'url(#km-arrow-primary)' : 'url(#km-arrow-muted)');
+        g.appendChild(path);
+
+        const portStart = document.createElementNS(ns, 'rect');
+        portStart.setAttribute('width', '5');
+        portStart.setAttribute('height', '5');
+        portStart.setAttribute('rx', '1');
+        portStart.setAttribute('fill', 'var(--bg-primary)');
+        portStart.setAttribute('stroke', 'var(--text-primary)');
+        portStart.setAttribute('stroke-width', '1.2');
+        g.appendChild(portStart);
+
+        const portEnd = document.createElementNS(ns, 'rect');
+        portEnd.setAttribute('width', '5');
+        portEnd.setAttribute('height', '5');
+        portEnd.setAttribute('rx', '1');
+        portEnd.setAttribute('fill', 'var(--text-primary)');
+        g.appendChild(portEnd);
+
+        const pkt = document.createElementNS(ns, 'rect');
+        pkt.setAttribute('width', conn.primary ? '6' : '4.5');
+        pkt.setAttribute('height', conn.primary ? '6' : '4.5');
+        pkt.setAttribute('rx', '1');
+        pkt.setAttribute('fill', 'var(--text-primary)');
+        g.appendChild(pkt);
+
+        const badgeG = document.createElementNS(ns, 'g');
+        const badgeBg = document.createElementNS(ns, 'rect');
+        const labelLen = (conn.label || '').length * 5.2 + 10;
+        badgeBg.setAttribute('width', String(labelLen));
+        badgeBg.setAttribute('height', '14');
+        badgeBg.setAttribute('x', String(-labelLen / 2));
+        badgeBg.setAttribute('y', '-7');
+        badgeBg.setAttribute('rx', '2');
+        badgeBg.setAttribute('fill', 'var(--bg-primary)');
+        badgeBg.setAttribute('stroke', 'var(--border-hairline)');
+        badgeBg.setAttribute('stroke-width', '1');
+
+        const badgeTxt = document.createElementNS(ns, 'text');
+        badgeTxt.setAttribute('text-anchor', 'middle');
+        badgeTxt.setAttribute('dominant-baseline', 'central');
+        badgeTxt.setAttribute('fill', 'var(--text-muted)');
+        badgeTxt.setAttribute('font-family', 'IBM Plex Mono, monospace');
+        badgeTxt.setAttribute('font-size', '8px');
+        badgeTxt.textContent = conn.label;
+
+        badgeG.appendChild(badgeBg);
+        badgeG.appendChild(badgeTxt);
+        g.appendChild(badgeG);
+
+        diagramSvgLayer.appendChild(g);
+
+        diagramEdges.push({
+          from: conn.from,
+          to: conn.to,
+          primary: conn.primary,
+          pathEl: path,
+          portStartEl: portStart,
+          portEndEl: portEnd,
+          pktEl: pkt,
+          badgeEl: badgeG,
+          badgeBgEl: badgeBg,
+          badgeTxtEl: badgeTxt,
+          t: (cIdx * 0.21) % 1,
+          speed: conn.primary ? 0.0042 : 0.0028
+        });
+      });
+    }
+
     function rebuildMachine3D() {
       while (machineRoot.children.length > 0) {
         machineRoot.remove(machineRoot.children[0]);
+      }
+      while (miniRoot.children.length > 0) {
+        miniRoot.remove(miniRoot.children[0]);
       }
       labelsLayer.innerHTML = '';
       activeAnimators = [];
@@ -796,7 +1160,50 @@
 
       const frameMats = createPartMaterials(null, false);
 
-      // 1. Place each component at its (x, z) coordinate
+      // Compute Spanning Tree + Secondary Loop Connections first so cards know their linked peers
+      const primaryEdges = [];
+      const secondaryEdges = [];
+      if (machineParts.length > 1) {
+        const connected = new Set([0]);
+        while (connected.size < machineParts.length) {
+          let bestFrom = -1;
+          let bestTo = -1;
+          let bestDist = Infinity;
+
+          connected.forEach((i) => {
+            for (let j = 0; j < machineParts.length; j++) {
+              if (connected.has(j)) continue;
+              const dx = machineParts[j].x - machineParts[i].x;
+              const dz = machineParts[j].z - machineParts[i].z;
+              const d = Math.hypot(dx, dz);
+              if (d < bestDist) {
+                bestDist = d;
+                bestFrom = i;
+                bestTo = j;
+              }
+            }
+          });
+
+          if (bestTo !== -1) {
+            connected.add(bestTo);
+            primaryEdges.push([bestFrom, bestTo]);
+          } else {
+            break;
+          }
+        }
+
+        // Add up to 2 secondary cross-links between outer ring neighbors for schematic richness
+        if (machineParts.length >= 4) {
+          secondaryEdges.push([1, 2]);
+          if (machineParts.length >= 6) {
+            secondaryEdges.push([machineParts.length - 2, machineParts.length - 1]);
+          }
+        }
+      }
+
+      buildDiagramSvgConnections(primaryEdges, secondaryEdges);
+
+      // 1. Place each component at its (x, z) coordinate & build its live 3D miniature for Diagram Mode
       machineParts.forEach((part, idx) => {
         if (typeof part.x !== 'number' || typeof part.z !== 'number') {
           layoutCluster2D(machineParts);
@@ -824,16 +1231,106 @@
         machineRoot.add(built.group);
         activeAnimators.push(...built.animators);
 
-        // Minimal Floating Tag
+        // Build dedicated full-opacity 3D miniature replica of this exact mechanism for its Diagram Card
+        const miniMats = createPartMaterials(part.color, isSel, true);
+        const miniBuilt = createMechanismMesh(part.type, miniMats, idx);
+        miniBuilt.group.visible = false;
+        miniRoot.add(miniBuilt.group);
+
+        // Connected peer badges for diagram card footer
+        const peers = [];
+        primaryEdges.forEach(([a, b]) => {
+          if (a === idx) peers.push(`→0${b + 1}`);
+          else if (b === idx) peers.push(`←0${a + 1}`);
+        });
+
+        const mechMeta = MECHANISM_PARTS.find(m => m.type === part.type);
+        const defaultNote = mechMeta ? `${mechMeta.label} (${mechMeta.sub}) linked in ${machineTitle}.` : `Active component in ${machineTitle}.`;
+        if (typeof part.notes !== 'string') {
+          part.notes = defaultNote;
+        }
+
+        // Hybrid 3D Floating Tag / 2D Schematic Component Card (with Live Moving 3D Preview + Textarea)
         const tag = document.createElement('div');
         tag.className = `part-tag ${isSel ? 'selected' : ''}`;
         const dotColor = part.color || (isDarkPolarity ? '#f0efeb' : '#141413');
+        const stepStr = String(idx + 1).padStart(2, '0');
         tag.innerHTML = `
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${dotColor};"></span>
-          <span>${part.name}</span>
+          <div class="part-card-header">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="font-mono-tech text-[9px] opacity-65 shrink-0">${stepStr}</span>
+              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${dotColor};"></span>
+              <span class="part-card-title truncate">${part.name}</span>
+            </div>
+            <span class="diagram-type-badge">${part.type.toUpperCase()}</span>
+          </div>
+          <div class="diagram-card-body">
+            <canvas class="diagram-mini-canvas" width="128" height="128" title="Live 3D ${part.type} mechanism"></canvas>
+            <textarea class="diagram-part-notes" rows="3" ${isViewerOnly ? 'readonly' : ''} placeholder="Component spec or notes..."></textarea>
+          </div>
+          <div class="diagram-card-footer">
+            <span>${mechMeta ? mechMeta.label.toUpperCase() : part.type.toUpperCase()}</span>
+            <span>${peers.slice(0, 4).join(' ') || 'CORE'}</span>
+          </div>
         `;
-        tag.addEventListener('click', (e) => {
+
+        const notesTextarea = tag.querySelector('.diagram-part-notes');
+        if (notesTextarea) {
+          notesTextarea.value = part.notes;
+          notesTextarea.addEventListener('pointerdown', (e) => e.stopPropagation());
+          notesTextarea.addEventListener('mousedown', (e) => e.stopPropagation());
+          notesTextarea.addEventListener('click', (e) => e.stopPropagation());
+          notesTextarea.addEventListener('input', (e) => {
+            part.notes = e.target.value;
+          });
+        }
+
+        const miniCanvasEl = tag.querySelector('.diagram-mini-canvas');
+        const miniCtx = miniCanvasEl ? miniCanvasEl.getContext('2d') : null;
+
+        // Support dragging component cards in Diagram Mode & clicking to open builder popup
+        let cardDragStart = null;
+        tag.addEventListener('pointerdown', (e) => {
+          if (e.target === notesTextarea) return;
+          if (!isDiagramMode) return;
           e.stopPropagation();
+          cardDragStart = {
+            x: e.clientX,
+            y: e.clientY,
+            origX: part.diagDragX || 0,
+            origY: part.diagDragY || 0,
+            moved: false
+          };
+          const onMove = (me) => {
+            if (!cardDragStart) return;
+            const dx = me.clientX - cardDragStart.x;
+            const dy = me.clientY - cardDragStart.y;
+            if (Math.hypot(dx, dy) > 4) cardDragStart.moved = true;
+            part.diagDragX = cardDragStart.origX + dx;
+            part.diagDragY = cardDragStart.origY + dy;
+          };
+          const onUp = (ue) => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            const wasDragged = cardDragStart && cardDragStart.moved;
+            cardDragStart = null;
+            if (!wasDragged) {
+              selectedIdx = idx;
+              if (!isViewerOnly) {
+                openPopupForPart(idx, ue.clientX, ue.clientY);
+              } else {
+                partNodes.forEach((n, i) => n.labelEl.classList.toggle('selected', i === selectedIdx));
+              }
+            }
+          };
+          window.addEventListener('pointermove', onMove);
+          window.addEventListener('pointerup', onUp);
+        });
+
+        tag.addEventListener('click', (e) => {
+          if (e.target === notesTextarea) return;
+          e.stopPropagation();
+          if (isDiagramMode) return; // Handled on pointerup in Diagram Mode to distinguish drag vs click
           if (isViewerOnly) return;
           openPopupForPart(idx, e.clientX, e.clientY);
         });
@@ -843,82 +1340,59 @@
           index: idx,
           group: built.group,
           hitMesh: hitBox,
-          labelEl: tag
+          labelEl: tag,
+          miniGroup: miniBuilt.group,
+          miniAnimators: miniBuilt.animators,
+          miniCtx,
+          currentScreenX: window.innerWidth / 2,
+          currentScreenY: window.innerHeight / 2,
+          halfW: 110,
+          halfH: 48
         });
       });
 
-      // 2. Connect every component in the 2D cluster to its nearest neighbor (Spanning Tree)
-      if (machineParts.length > 1) {
-        const connected = new Set([0]);
-        const edges = [];
+      // 2. Build 3D mechanical coupling shafts & transfer gears along Spanning Tree edges
+      primaryEdges.forEach(([i, j], edgeIdx) => {
+        const pA = machineParts[i];
+        const pB = machineParts[j];
+        const dx = pB.x - pA.x;
+        const dz = pB.z - pA.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 0.2) return;
 
-        while (connected.size < machineParts.length) {
-          let bestFrom = -1;
-          let bestTo = -1;
-          let bestDist = Infinity;
+        const midX = (pA.x + pB.x) / 2;
+        const midZ = (pA.z + pB.z) / 2;
+        const angle = Math.atan2(dz, dx);
 
-          connected.forEach((i) => {
-            for (let j = 0; j < machineParts.length; j++) {
-              if (connected.has(j)) continue;
-              const dx = machineParts[j].x - machineParts[i].x;
-              const dz = machineParts[j].z - machineParts[i].z;
-              const d = Math.hypot(dx, dz);
-              if (d < bestDist) {
-                bestDist = d;
-                bestFrom = i;
-                bestTo = j;
-              }
-            }
-          });
+        // Structural lower chassis tie beam
+        const beam = makeMesh(new THREE.BoxGeometry(dist, 0.12, 0.36), frameMats.secondary, frameMats.edge);
+        beam.position.set(midX, -1.15, midZ);
+        beam.rotation.y = -angle;
+        machineRoot.add(beam);
 
-          if (bestTo !== -1) {
-            connected.add(bestTo);
-            edges.push([bestFrom, bestTo]);
-          } else {
-            break;
-          }
-        }
+        // Spinning universal coupling shaft between the two units
+        const shaftGroup = new THREE.Group();
+        shaftGroup.position.set(midX, -0.45, midZ);
+        shaftGroup.rotation.y = -angle;
+        machineRoot.add(shaftGroup);
 
-        edges.forEach(([i, j], edgeIdx) => {
-          const pA = machineParts[i];
-          const pB = machineParts[j];
-          const dx = pB.x - pA.x;
-          const dz = pB.z - pA.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 0.2) return;
+        const rod = makeMesh(new THREE.CylinderGeometry(0.065, 0.065, dist, 10), frameMats.secondary, frameMats.edge, shaftGroup);
+        rod.rotation.z = Math.PI / 2;
 
-          const midX = (pA.x + pB.x) / 2;
-          const midZ = (pA.z + pB.z) / 2;
-          const angle = Math.atan2(dz, dx);
+        // Meshing horizontal transfer gear right at the midpoint
+        const idlerRadius = Math.max(0.36, Math.min(0.72, (dist - 1.65) * 0.5));
+        const idlerGear = buildSpurGear(idlerRadius, 0.18, 12, frameMats.primary, frameMats.edge);
+        idlerGear.position.set(midX, -0.85, midZ);
+        machineRoot.add(idlerGear);
 
-          // Structural lower chassis tie beam
-          const beam = makeMesh(new THREE.BoxGeometry(dist, 0.12, 0.36), frameMats.secondary, frameMats.edge);
-          beam.position.set(midX, -1.15, midZ);
-          beam.rotation.y = -angle;
-          machineRoot.add(beam);
-
-          // Spinning universal coupling shaft between the two units
-          const shaftGroup = new THREE.Group();
-          shaftGroup.position.set(midX, -0.45, midZ);
-          shaftGroup.rotation.y = -angle;
-          machineRoot.add(shaftGroup);
-
-          const rod = makeMesh(new THREE.CylinderGeometry(0.065, 0.065, dist, 10), frameMats.secondary, frameMats.edge, shaftGroup);
-          rod.rotation.z = Math.PI / 2;
-
-          // Meshing horizontal transfer gear right at the midpoint
-          const idlerRadius = Math.max(0.36, Math.min(0.72, (dist - 1.65) * 0.5));
-          const idlerGear = buildSpurGear(idlerRadius, 0.18, 12, frameMats.primary, frameMats.edge);
-          idlerGear.position.set(midX, -0.85, midZ);
-          machineRoot.add(idlerGear);
-
-          const dir = edgeIdx % 2 === 0 ? -1 : 1;
-          activeAnimators.push((t) => {
-            rod.rotation.x = t * 2.4 * dir;
-            idlerGear.rotation.y = t * 2.2 * dir;
-          });
+        const dir = edgeIdx % 2 === 0 ? -1 : 1;
+        activeAnimators.push((t) => {
+          rod.rotation.x = t * 2.4 * dir;
+          idlerGear.rotation.y = t * 2.2 * dir;
         });
-      }
+      });
+
+      updateSceneMachineOpacity(1 - diagramTransition);
     }
 
     /**
@@ -1034,7 +1508,7 @@
       if (machineParts[selectedIdx]) {
         machineParts[selectedIdx].name = e.target.value || 'module';
         if (partNodes[selectedIdx]) {
-          const span = partNodes[selectedIdx].labelEl.querySelector('span:last-child');
+          const span = partNodes[selectedIdx].labelEl.querySelector('.part-card-title');
           if (span) span.textContent = machineParts[selectedIdx].name;
         }
       }
@@ -1085,6 +1559,9 @@
     let camTheta = 0.45;
     let camPhi = 0.88;
     let camRadius = 14.5;
+    let targetCamTheta = 0.45;
+    let targetCamPhi = 0.88;
+    let targetCamRadius = 14.5;
     const camTarget = new THREE.Vector3(0, -0.2, 0);
 
     const raycaster = new THREE.Raycaster();
@@ -1102,6 +1579,11 @@
       if (e.target.closest('.part-tag')) return;
       pointerDownPos = { x: e.clientX, y: e.clientY };
       prevPointerPos = { x: e.clientX, y: e.clientY };
+
+      if (isDiagramMode) {
+        partPopup.classList.add('hidden');
+        return;
+      }
 
       const rect = canvas.getBoundingClientRect();
       pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1123,6 +1605,8 @@
       const dy = e.clientY - prevPointerPos.y;
       prevPointerPos = { x: e.clientX, y: e.clientY };
 
+      if (isDiagramMode) return;
+
       if (isDraggingPart && draggedPartIdx !== -1 && !isViewerOnly) {
         const movedDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
         if (movedDist > 5) {
@@ -1139,15 +1623,15 @@
           }
         }
       } else if (isOrbiting) {
-        camTheta -= dx * 0.0065;
-        camPhi = Math.max(0.28, Math.min(1.42, camPhi - dy * 0.0055));
+        targetCamTheta -= dx * 0.0065;
+        targetCamPhi = Math.max(0.28, Math.min(1.42, targetCamPhi - dy * 0.0055));
       }
     });
 
     window.addEventListener('pointerup', (e) => {
       const distMoved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
 
-      if (distMoved < 6 && e.target === canvas && !isViewerOnly) {
+      if (!isDiagramMode && distMoved < 6 && e.target === canvas && !isViewerOnly) {
         const rect = canvas.getBoundingClientRect();
         pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1172,14 +1656,60 @@
 
     wrapper.addEventListener('wheel', (e) => {
       e.preventDefault();
-      camRadius = Math.max(6.5, Math.min(28, camRadius + e.deltaY * 0.012));
+      if (isDiagramMode) return;
+      targetCamRadius = Math.max(6.5, Math.min(28, targetCamRadius + e.deltaY * 0.012));
     }, { passive: false });
 
     /**
      * ============================================================================
-     * 10. TOP BAR CONTROLS (SCRATCH, X-RAY, THEME, VIEWER DOWNLOAD & SHARE)
+     * 10. DIAGRAM MODE CONTROLLER & TOP BAR CONTROLS
      * ============================================================================
      */
+    function setDiagramMode(enabled) {
+      const next = !!enabled;
+      if (isDiagramMode === next) return;
+      isDiagramMode = next;
+      document.body.classList.toggle('diagram-mode', isDiagramMode);
+
+      if (isDiagramMode) {
+        savedMachineOrbit = { theta: targetCamTheta, phi: targetCamPhi, radius: targetCamRadius };
+        targetCamTheta = 0.0;
+        targetCamPhi = 0.36;
+        targetCamRadius = 18.5;
+        partPopup.classList.add('hidden');
+      } else {
+        targetCamTheta = savedMachineOrbit.theta ?? 0.45;
+        targetCamPhi = savedMachineOrbit.phi ?? 0.88;
+        targetCamRadius = savedMachineOrbit.radius ?? 14.5;
+      }
+
+      if (btnDiagram) {
+        btnDiagram.classList.toggle('active', isDiagramMode);
+        btnDiagram.textContent = isDiagramMode ? '← 3D MACHINE' : '◇ DIAGRAM';
+      }
+      if (diagramStageBanner) {
+        diagramStageBanner.classList.toggle('hidden', !isDiagramMode);
+        diagramStageBanner.classList.toggle('flex', isDiagramMode);
+      }
+    }
+
+    if (btnDiagram) {
+      btnDiagram.addEventListener('click', () => setDiagramMode(!isDiagramMode));
+    }
+    if (btnReturnMachine) {
+      btnReturnMachine.addEventListener('click', () => setDiagramMode(false));
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+      if (tag === 'input' || tag === 'textarea') return;
+      if (e.key === 'd' || e.key === 'D') {
+        setDiagramMode(!isDiagramMode);
+      } else if (e.key === 'Escape' && isDiagramMode) {
+        setDiagramMode(false);
+      }
+    });
+
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.textContent = msg;
@@ -1192,7 +1722,7 @@
       machineTitle = 'Custom Machine';
       document.getElementById('machine-title').textContent = machineTitle;
       machineParts = [
-        { id: 'p_root', name: 'Primary Drive Core', type: 'gear', color: null, x: 0, z: 0 }
+        { id: 'p_root', name: 'Primary Drive Core', notes: 'Central rotary drive core.', type: 'gear', color: null, x: 0, z: 0 }
       ];
       selectedIdx = 0;
       rebuildMachine3D();
@@ -1232,7 +1762,15 @@
         xray: isWireframe,
         viewerOnly: true
       };
-      let htmlSource = document.documentElement.outerHTML;
+      const docClone = document.documentElement.cloneNode(true);
+      const cloneLabels = docClone.querySelector('#labels-layer');
+      if (cloneLabels) cloneLabels.innerHTML = '';
+      const cloneSvg = docClone.querySelector('#diagram-svg-layer');
+      if (cloneSvg) cloneSvg.innerHTML = '';
+      const cloneBody = docClone.querySelector('body');
+      if (cloneBody) cloneBody.classList.remove('diagram-mode');
+
+      let htmlSource = docClone.outerHTML;
       const replacement = `/*__EXPORTED_STATE_START__*/\n    const EXPORTED_STATE = ${JSON.stringify(exportPayload)};\n    /*__EXPORTED_STATE_END__*/`;
       htmlSource = htmlSource.replace(/\/\*__EXPORTED_STATE_START__\*\/[\s\S]*?\/\*__EXPORTED_STATE_END__\*\//, replacement);
 
@@ -1255,7 +1793,7 @@
         d: isDarkPolarity ? 1 : 0,
         x: isWireframe ? 1 : 0,
         v: 1,
-        p: machineParts.map(p => [p.name, p.type, p.color || 0, p.x, p.z])
+        p: machineParts.map(p => [p.name, p.type, p.color || 0, p.x, p.z, p.notes || ''])
       };
       const token = await compressToUrlHash(compact);
       const shareUrl = `${window.location.origin}${window.location.pathname}#m=${token}`;
@@ -1336,7 +1874,7 @@
       const lines = raw
         .split(/\n+/)
         .map(l => l.replace(/^[-*•\d.)\s]+/, '').trim())
-        .filter(l => l.length >= 3 && l.length <= 95);
+        .filter(l => l.length >= 3 && l.length <= 160);
 
       const chosen = lines.slice(0, 8);
       if (chosen.length === 0) return;
@@ -1345,10 +1883,15 @@
       document.getElementById('machine-title').textContent = machineTitle;
 
       machineParts = chosen.map((line, idx) => {
-        const cleanName = line.split(/[:—–-]/)[0].trim().slice(0, 32);
+        // Split only on ':' or spaced dashes (' — ', ' – ', ' - ') so hyphenated names like 'tool-registry' or 'agent-core' stay intact
+        const sepParts = line.split(/\s*:\s*|\s+[—–-]\s+/);
+        const rawTitle = (sepParts[0] || line).trim();
+        const cleanName = rawTitle.slice(0, 46);
+        const detailNotes = sepParts.length > 1 ? sepParts.slice(1).join(' — ').trim() : line;
         return {
           id: 'p_comp_' + idx,
           name: cleanName || `module-${idx + 1}`,
+          notes: detailNotes,
           type: inferTypeFromText(line, idx),
           color: null,
           x: 0,
