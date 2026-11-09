@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kinetic Machine Canvas — 3D Architecture Builder</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Three.js r128 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- PDF.js for client-side PDF architecture/spec parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    :root {
+      --bg-primary: #f2f1ed;
+      --bg-glass: rgba(242, 241, 237, 0.86);
+      --bg-card: rgba(255, 255, 255, 0.92);
+      --text-primary: #141413;
+      --text-secondary: #52514e;
+      --text-muted: #85847f;
+      --border-hairline: rgba(20, 20, 19, 0.14);
+      --border-strong: #141413;
+      --accent-active: #141413;
+      --accent-active-text: #f2f1ed;
+    }
+
+    body.dark-polarity {
+      --bg-primary: #0d0d0c;
+      --bg-glass: rgba(18, 18, 17, 0.86);
+      --bg-card: rgba(26, 26, 24, 0.94);
+      --text-primary: #f0efeb;
+      --text-secondary: #a6a59f;
+      --text-muted: #666560;
+      --border-hairline: rgba(240, 239, 235, 0.14);
+      --border-strong: #f0efeb;
+      --accent-active: #f0efeb;
+      --accent-active-text: #0d0d0c;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, sans-serif;
+      overflow: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .font-mono-tech {
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .font-display {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .glass {
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-hairline);
+    }
+
+    #canvas-wrapper {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      cursor: grab;
+    }
+
+    #canvas-wrapper:active {
+      cursor: grabbing;
+    }
+
+    /* Minimal floating 3D tags */
+    .part-tag {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hairline);
+      color: var(--text-primary);
+      font-size: 10.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+      transition: transform 0.12s ease, border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .part-tag:hover {
+      border-color: var(--border-strong);
+      transform: translate(-50%, -105%) scale(1.03);
+      z-index: 35;
+    }
+
+    .part-tag.selected {
+      background: var(--accent-active);
+      color: var(--accent-active-text);
+      border-color: var(--border-strong);
+      z-index: 40;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    }
+
+    /* Part library tile in popup */
+    .part-tile {
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-card);
+      border-radius: 5px;
+      padding: 6px 8px;
+      cursor: pointer;
+      transition: all 0.14s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      text-align: left;
+    }
+
+    .part-tile:hover {
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
+    }
+
+    .part-tile.active-type {
+      background: var(--accent-active);
+      color: var(--accent-active-text);
+      border-color: var(--border-strong);
+    }
+
+    .pill-btn {
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.14s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pill-btn:hover {
+      border-color: var(--border-strong);
+    }
+
+    .pill-btn.active {
+      background: var(--accent-active);
+      color: var(--accent-active-text);
+      border-color: var(--border-strong);
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 9999px;
+      cursor: pointer;
+      border: 1.5px solid rgba(128,128,128,0.4);
+      transition: transform 0.12s ease;
+    }
+
+    .swatch:hover, .swatch.active {
+      transform: scale(1.22);
+      border-color: var(--border-strong);
+    }
+
+    /* Read-only viewer mode (used by Download HTML & Share Link) */
+    body.viewer-only .builder-ui {
+      display: none !important;
+    }
+
+    /* Tutorial Spotlight Highlight */
+    @keyframes pulse-ring {
+      0%, 100% {
+        box-shadow: 0 0 0 2px var(--border-strong), 0 0 18px rgba(240, 239, 235, 0.45);
+      }
+      50% {
+        box-shadow: 0 0 0 4px var(--border-strong), 0 0 28px rgba(240, 239, 235, 0.85);
+      }
+    }
+
+    .tutorial-highlight {
+      position: relative !important;
+      z-index: 60 !important;
+      animation: pulse-ring 1.5s infinite ease-in-out;
+      border-color: var(--border-strong) !important;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden relative dark-polarity">
+
+  <!-- FULL-SCREEN 3D INTERLOCKING MACHINE CANVAS -->
+  <div id="canvas-wrapper">
+    <canvas id="webgl-canvas" class="w-full h-full block"></canvas>
+    <div id="labels-layer" class="absolute inset-0 pointer-events-none overflow-hidden z-20"></div>
+  </div>
+
+  <!-- MINIMAL HIERARCHICAL TOP BAR -->
+  <header class="fixed top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none">
+    <!-- Left: Machine Name + Hierarchical Main Actions (+ COMPILE & SCRATCH) -->
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <div id="brand-chip" class="glass px-3 py-1.5 rounded flex items-center gap-2.5 shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-current animate-pulse"></span>
+        <span id="machine-title" class="font-display text-xs font-semibold tracking-tight">hr-agent</span>
+      </div>
+
+      <!-- Hierarchical Main Builder Actions (Hidden in Viewer-Only Share/Download) -->
+      <button id="btn-open-compiler" class="pill-btn active builder-ui font-medium" title="Auto-compile a PDF or spec into a 3D machine">
+        + COMPILE
+      </button>
+      <button id="btn-clear-scratch" class="pill-btn builder-ui" title="Start a blank machine from scratch">
+        SCRATCH
+      </button>
+    </div>
+
+    <!-- Right: View & Export Actions -->
+    <div class="flex items-center gap-1.5 pointer-events-auto">
+      <button id="btn-wireframe" class="pill-btn active" title="Toggle X-Ray Blueprint">X-RAY</button>
+      <button id="btn-theme" class="pill-btn active" title="Toggle Dark / Light Mode">DARK</button>
+      <button id="btn-download-html" class="pill-btn builder-ui" title="Download standalone viewer HTML">↓ DOWNLOAD</button>
+      <button id="btn-share-link" class="pill-btn builder-ui" title="Copy compressed viewer-only link">⇄ SHARE LINK</button>
+      <button id="btn-help-tour" class="pill-btn builder-ui px-2" title="Show interactive guide">?</button>
+    </div>
+  </header>
+
+  <!-- SINGLE-WINDOW GUIDED SPOTLIGHT TUTORIAL (FIRST VISIT IN BUILDER MODE ONLY) -->
+  <div id="tutorial-window" class="builder-ui fixed z-50 hidden glass rounded-md p-4 shadow-2xl w-80 pointer-events-auto transition-all duration-200" style="border-color: var(--border-strong);">
+    <div class="flex items-center justify-between pb-2 mb-2" style="border-bottom: 1px solid var(--border-hairline);">
+      <span id="tutorial-step-badge" class="font-mono-tech text-[9px] px-1.5 py-0.5 rounded uppercase" style="background: var(--accent-active); color: var(--accent-active-text);">
+        STEP 1 OF 5
+      </span>
+      <button id="btn-tutorial-skip" type="button" class="font-mono-tech text-[9px] uppercase tracking-wider opacity-70 hover:opacity-100">
+        Skip ✕
+      </button>
+    </div>
+    <h4 id="tutorial-title" class="font-display text-xs font-semibold mb-1">
+      Interactive 3D Machine Canvas
+    </h4>
+    <p id="tutorial-body" class="text-[11px] leading-relaxed mb-3.5" style="color: var(--text-secondary);">
+      Click any 3D part to swap its mechanism, rename it, or drag it across the floor. Click any empty spot on the floor grid to place a new interlocking part.
+    </p>
+    <div class="flex items-center justify-between">
+      <div id="tutorial-dots" class="flex items-center gap-1"></div>
+      <div class="flex items-center gap-1.5">
+        <button id="btn-tutorial-prev" type="button" class="pill-btn px-2.5 py-1 text-[9px]">← BACK</button>
+        <button id="btn-tutorial-next" type="button" class="pill-btn active px-3 py-1 text-[9px]">NEXT →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTEXTUAL POPUP BUILDER MENU (OPENS WHEN CLICKING A PART OR THE FLOOR GRID) -->
+  <div id="part-popup" class="builder-ui fixed z-40 hidden glass rounded-md p-3 shadow-2xl w-[360px] max-w-[94vw] pointer-events-auto">
+    <!-- Top Row: Selected Part / Grid Target + Actions -->
+    <div class="flex items-center justify-between gap-2 pb-2 mb-2" style="border-bottom: 1px solid var(--border-hairline);">
+      <div class="flex items-center gap-1.5 flex-1 min-w-0">
+        <span id="popup-context-badge" class="font-mono-tech text-[9px] px-1.5 py-0.5 rounded uppercase" style="background: var(--accent-active); color: var(--accent-active-text);">PART</span>
+        <input id="part-name-input" type="text" class="text-xs font-medium bg-transparent px-1.5 py-0.5 rounded border border-transparent focus:border-current focus:outline-none w-full truncate" value="agent-core" title="Rename component" />
+      </div>
+      <div class="flex items-center gap-1 shrink-0">
+        <button id="btn-mode-append" class="pill-btn active text-[9px] py-0.5 px-2" title="Add a new meshing part at this spot">+ ADD</button>
+        <button id="btn-mode-swap" class="pill-btn text-[9px] py-0.5 px-2" title="Swap selected part's mechanism">SWAP</button>
+        <button id="btn-delete-part" class="pill-btn text-[9px] py-0.5 px-2 text-red-600" title="Remove selected part">✕</button>
+        <button id="btn-close-popup" class="pill-btn text-[9px] py-0.5 px-2" title="Close menu">DONE</button>
+      </div>
+    </div>
+
+    <!-- Pre-Built Moving Parts Grid -->
+    <div id="parts-grid" class="grid grid-cols-2 gap-1.5 mb-2.5"></div>
+
+    <!-- Bottom Row: Monochromatic Default + Optional Color Swatches -->
+    <div class="flex items-center justify-between pt-1.5" style="border-top: 1px solid var(--border-hairline);">
+      <div class="flex items-center gap-1.5">
+        <button id="btn-color-mono" class="pill-btn text-[9px] py-0.5 px-2">MONO</button>
+        <div id="swatch-row" class="flex items-center gap-1.5"></div>
+      </div>
+      <span class="font-mono-tech text-[9px]" style="color: var(--text-muted);">DRAG PART TO MOVE</span>
+    </div>
+  </div>
+
+  <!-- AUTO-COMPILER MODAL (UPLOAD PDF OR PASTE SPEC) -->
+  <div id="compiler-modal" class="builder-ui fixed inset-0 z-50 hidden items-center justify-center p-4" style="background: rgba(10, 10, 10, 0.65); backdrop-filter: blur(5px);">
+    <div class="glass w-full max-w-lg rounded-md p-5 shadow-2xl" style="background: var(--bg-primary); border-color: var(--border-strong);">
+      <div class="flex items-center justify-between pb-3 mb-3" style="border-bottom: 1px solid var(--border-hairline);">
+        <div>
+          <h3 class="font-display text-sm font-semibold">Compile Project Into 3D Machine</h3>
+          <p class="text-[11px]" style="color: var(--text-secondary);">Upload a technical PDF or paste component notes to auto-assemble a non-linear interlocking machine.</p>
+        </div>
+        <button id="btn-close-compiler" class="pill-btn">✕</button>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 mb-2.5">
+        <label class="pill-btn cursor-pointer">
+          <span>UPLOAD PDF / TXT</span>
+          <input id="file-upload-input" type="file" accept=".pdf,.txt,.md,.json" class="hidden" />
+        </label>
+        <span id="compile-status" class="font-mono-tech text-[10px]" style="color: var(--text-muted);">READY</span>
+      </div>
+
+      <input id="compile-title-input" type="text" class="w-full mb-2 p-2 rounded text-xs font-medium bg-transparent" style="border: 1px solid var(--border-hairline);" placeholder="System / Project Name (e.g., hr-agent, mission-data-grid-v3)" />
+
+      <textarea id="compile-spec-input" rows="6" class="w-full p-2.5 rounded font-mono-tech text-[11px] bg-transparent focus:outline-none mb-3" style="border: 1px solid var(--border-hairline);" placeholder="Paste architecture modules or upload PDF...&#10;Example:&#10;- Entra JWT + Reserve Run (409 if busy)&#10;- tool-registry (schemars JSON schema)&#10;- agent-core (≤40 iters, parallel tools)&#10;- embedded database + gov-sources (Postgres FTS)&#10;- sandbox-host (Hyper-V container)&#10;- llm api (gemini, claude, openai, openrouter)&#10;- store (Postgres gapless seq + SSE)"></textarea>
+
+      <div class="flex items-center justify-end gap-2">
+        <button id="btn-run-compile" class="pill-btn active px-4 py-1.5">BUILD MACHINE →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-4 right-4 z-50 hidden glass px-3 py-2 rounded text-xs font-mono-tech shadow-lg"></div>
+
+  <script>
+    /**
+     * ============================================================================
+     * 1. PDF.JS WORKER INIT
+     * ============================================================================
+     */
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    /**
+     * ============================================================================
+     * 2. PRE-BUILT MOVING MACHINE PARTS CATALOG
+     * ============================================================================
+     */
+    const MECHANISM_PARTS = [
+      { type: 'gear',     label: 'Spur Gear',       sub: 'Meshing Rotary Cog' },
+      { type: 'conveyor', label: 'Conveyor Belt',   sub: 'Rolling Track + Packets' },
+      { type: 'turbine',  label: 'Axial Turbine',   sub: 'Multi-Blade Rotor' },
+      { type: 'pistons',  label: '3-Piston Crank',  sub: 'Reciprocating Bank' },
+      { type: 'gyro',     label: 'Tri-Axial Gyro',  sub: 'Orbital Gimbal Core' },
+      { type: 'valve',    label: 'Gate Shutter',    sub: 'Dual Reciprocating Gate' },
+      { type: 'drum',     label: 'Rotary Drum',     sub: 'Slotted Ring Cylinder' },
+      { type: 'cam',      label: 'Wave Cam Shaft',  sub: 'Sinusoidal Tappet Array' }
+    ];
+
+    const OPTIONAL_SWATCHES = [
+      '#8c1d24', // Oxblood Red
+      '#2563eb', // Cobalt Blue
+      '#0d9488', // Teal
+      '#d97706', // Amber Brass
+      '#7c3aed', // Violet
+      '#16a34a'  // Emerald
+    ];
+
+    /**
+     * ============================================================================
+     * 3. INITIAL PROJECT MACHINE (ACTUAL NAMES FROM BRIEF, 2D CLUSTER LAYOUT)
+     * ============================================================================
+     */
+    /*__EXPORTED_STATE_START__*/
+    const EXPORTED_STATE = null;
+    /*__EXPORTED_STATE_END__*/
+
+    let machineTitle = 'hr-agent';
+
+    // Non-linear 2D cluster around the central `agent-core` hub (x, z coordinates)
+    let machineParts = [
+      { id: 'p1', name: 'agent-core (Turn Loop ≤40)',                        type: 'gyro',     color: null, x: 0.0,  z: 0.0  },
+      { id: 'p2', name: 'Entra JWT + 409 Run Lock',                          type: 'valve',    color: null, x: -3.2, z: -1.6 },
+      { id: 'p3', name: 'tool-registry (schemars)',                          type: 'gear',     color: null, x: -2.9, z: 1.7  },
+      { id: 'p4', name: 'llm api (gemini, claude, openai, openrouter)',      type: 'turbine',  color: null, x: 0.0,  z: -3.2 },
+      { id: 'p5', name: 'embedded database + gov-sources',                   type: 'pistons',  color: null, x: 0.0,  z: 3.2  },
+      { id: 'p6', name: 'sandbox-host (Hyper-V)',                            type: 'drum',     color: null, x: 3.1,  z: -1.7 },
+      { id: 'p7', name: 'store (Postgres Seq + SSE)',                        type: 'conveyor', color: null, x: 3.2,  z: 1.6  }
+    ];
+
+    // Computes a 2D non-linear cluster layout for any list of parts lacking explicit (x,z)
+    function layoutCluster2D(parts) {
+      if (!parts || parts.length === 0) return;
+      parts[0].x = 0;
+      parts[0].z = 0;
+      const count = parts.length - 1;
+      const radius = count <= 4 ? 3.0 : 3.35;
+      for (let i = 1; i < parts.length; i++) {
+        const ringIdx = i - 1;
+        const ringNum = Math.floor(ringIdx / 6);
+        const r = radius + ringNum * 2.9;
+        const itemsInRing = Math.min(6, count - ringNum * 6);
+        const angle = ((ringIdx % 6) / itemsInRing) * Math.PI * 2 - Math.PI * 0.75;
+        parts[i].x = Number((Math.cos(angle) * r).toFixed(2));
+        parts[i].z = Number((Math.sin(angle) * r).toFixed(2));
+      }
+    }
+
+    // Default state: Both Dark Mode (`isDarkPolarity = true`) and X-Ray (`isWireframe = true`) are ON by default
+    let selectedIdx = 0;
+    let paletteClickMode = 'append'; // 'append' or 'swap'
+    let pendingGridPoint = { x: 2.2, z: 2.0 };
+    let isWireframe = true;
+    let isDarkPolarity = true;
+    let isViewerOnly = false;
+
+    /**
+     * ============================================================================
+     * 4. URL SHARE HASH & EXPORTED STATE HYDRATION
+     * ============================================================================
+     */
+    async function compressToUrlHash(obj) {
+      const jsonStr = JSON.stringify(obj);
+      const bytes = new TextEncoder().encode(jsonStr);
+      if (typeof CompressionStream !== 'undefined') {
+        const cs = new CompressionStream('deflate-raw');
+        const writer = cs.writable.getWriter();
+        writer.write(bytes);
+        writer.close();
+        const compressed = await new Response(cs.readable).arrayBuffer();
+        const u8 = new Uint8Array(compressed);
+        let bin = '';
+        for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
+        return 'm1_' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+      return 'm0_' + btoa(unescape(encodeURIComponent(jsonStr))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    async function decompressFromUrlHash(token) {
+      const mode = token.slice(0, 3);
+      const b64 = token.slice(3).replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+      const bin = atob(b64 + pad);
+      if (mode === 'm1_' && typeof DecompressionStream !== 'undefined') {
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        const ds = new DecompressionStream('deflate-raw');
+        const writer = ds.writable.getWriter();
+        writer.write(u8);
+        writer.close();
+        const decompressed = await new Response(ds.readable).arrayBuffer();
+        return JSON.parse(new TextDecoder().decode(decompressed));
+      }
+      return JSON.parse(decodeURIComponent(escape(bin)));
+    }
+
+    async function hydrateInitialState() {
+      if (EXPORTED_STATE && Array.isArray(EXPORTED_STATE.parts)) {
+        machineTitle = EXPORTED_STATE.title || machineTitle;
+        machineParts = EXPORTED_STATE.parts;
+        isDarkPolarity = EXPORTED_STATE.dark !== undefined ? !!EXPORTED_STATE.dark : true;
+        isWireframe = EXPORTED_STATE.xray !== undefined ? !!EXPORTED_STATE.xray : true;
+        isViewerOnly = !!EXPORTED_STATE.viewerOnly;
+      } else if (window.location.hash.startsWith('#m=')) {
+        try {
+          const decoded = await decompressFromUrlHash(window.location.hash.slice(3));
+          if (decoded && Array.isArray(decoded.p) && decoded.p.length > 0) {
+            machineTitle = decoded.t || machineTitle;
+            machineParts = decoded.p.map((item, i) => ({
+              id: 'p_' + i,
+              name: item[0],
+              type: item[1],
+              color: item[2] || null,
+              x: typeof item[3] === 'number' ? item[3] : 0,
+              z: typeof item[4] === 'number' ? item[4] : 0
+            }));
+            isDarkPolarity = decoded.d !== undefined ? decoded.d === 1 : true;
+            isWireframe = decoded.x !== undefined ? decoded.x === 1 : true;
+            isViewerOnly = decoded.v === 1;
+          }
+        } catch (err) {
+          console.warn('Share hash decode warning:', err);
+        }
+      }
+
+      if (isViewerOnly) {
+        document.body.classList.add('viewer-only');
+      }
+      document.getElementById('machine-title').textContent = machineTitle;
+    }
+
+    /**
+     * ============================================================================
+     * 5. THREE.JS SCENE & MONOCHROMATIC / COLOR MATERIAL FACTORY
+     * ============================================================================
+     */
+    const canvas = document.getElementById('webgl-canvas');
+    const labelsLayer = document.getElementById('labels-layer');
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d0d0c);
+    scene.fog = new THREE.FogExp2(0x0d0d0c, 0.022);
+
+    const camera = new THREE.PerspectiveCamera(36, window.innerWidth / window.innerHeight, 0.1, 200);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.78);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(12, 22, 16);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    scene.add(dirLight);
+
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.35);
+    backLight.position.set(-14, 10, -12);
+    scene.add(backLight);
+
+    // Invisible Raycast Floor Plane for clicking empty grid locations & dragging parts
+    const floorHitPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(120, 120),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    floorHitPlane.rotation.x = -Math.PI / 2;
+    floorHitPlane.position.y = -1.35;
+    scene.add(floorHitPlane);
+
+    const floorGroup = new THREE.Group();
+    scene.add(floorGroup);
+
+    function rebuildFloor() {
+      while (floorGroup.children.length > 0) floorGroup.remove(floorGroup.children[0]);
+      const c1 = isDarkPolarity ? 0x2c2c29 : 0xd2d0c8;
+      const c2 = isDarkPolarity ? 0x1a1a18 : 0xe3e1da;
+      const grid = new THREE.GridHelper(64, 64, c1, c2);
+      grid.position.y = -1.35;
+      floorGroup.add(grid);
+    }
+
+    function createPartMaterials(customHex, isSelected) {
+      let primaryHex, secondaryHex, edgeHex;
+      if (customHex) {
+        const base = new THREE.Color(customHex);
+        primaryHex = base.getHex();
+        secondaryHex = base.clone().multiplyScalar(0.68).getHex();
+        edgeHex = isDarkPolarity ? 0xf0efeb : 0x141413;
+      } else {
+        if (isDarkPolarity) {
+          primaryHex = isSelected ? 0x383834 : 0x222220;
+          secondaryHex = 0x151514;
+          edgeHex = isSelected ? 0xffffff : 0x999892;
+        } else {
+          primaryHex = isSelected ? 0xd8d6ce : 0xeae8e1;
+          secondaryHex = 0xc8c6be;
+          edgeHex = isSelected ? 0x000000 : 0x2c2c2a;
+        }
+      }
+
+      return {
+        primary: new THREE.MeshStandardMaterial({
+          color: primaryHex,
+          roughness: 0.42,
+          metalness: 0.35,
+          wireframe: isWireframe,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
+        }),
+        secondary: new THREE.MeshStandardMaterial({
+          color: secondaryHex,
+          roughness: 0.55,
+          metalness: 0.45,
+          wireframe: isWireframe
+        }),
+        edge: new THREE.LineBasicMaterial({
+          color: edgeHex,
+          transparent: true,
+          opacity: isSelected ? 0.96 : (isWireframe ? 0.85 : 0.55)
+        })
+      };
+    }
+
+    function makeMesh(geo, mat, edgeMat, parent) {
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = !isWireframe;
+      m.receiveShadow = !isWireframe;
+      const edges = new THREE.EdgesGeometry(geo, 22);
+      const lines = new THREE.LineSegments(edges, edgeMat);
+      m.add(lines);
+      if (parent) parent.add(m);
+      return m;
+    }
+
+    function buildSpurGear(radius, thickness, teeth, mat, edgeMat) {
+      const g = new THREE.Group();
+      makeMesh(new THREE.CylinderGeometry(radius, radius, thickness, 28), mat, edgeMat, g);
+      makeMesh(new THREE.CylinderGeometry(radius * 0.4, radius * 0.4, thickness * 1.35, 16), mat, edgeMat, g);
+      const toothGeo = new THREE.BoxGeometry(radius * 0.25, thickness * 0.92, radius * 0.28);
+      for (let i = 0; i < teeth; i++) {
+        const a = (i / teeth) * Math.PI * 2;
+        const t = makeMesh(toothGeo, mat, edgeMat, g);
+        t.position.set(Math.cos(a) * (radius + radius * 0.08), 0, Math.sin(a) * (radius + radius * 0.08));
+        t.rotation.y = -a;
+      }
+      return g;
+    }
+
+    /**
+     * ============================================================================
+     * 6. PRE-BUILT SELF-MOVING COMPONENT CONSTRUCTORS
+     * ============================================================================
+     */
+    function createMechanismMesh(type, mats, index) {
+      const group = new THREE.Group();
+      const animators = [];
+      const dir = index % 2 === 0 ? 1 : -1;
+
+      // Every unit has a bottom horizontal ring-gear Coupling Base so 2D neighbors mesh cleanly
+      const baseRingGear = buildSpurGear(0.92, 0.16, 16, mats.secondary, mats.edge);
+      baseRingGear.position.y = -0.85;
+      group.add(baseRingGear);
+      animators.push((t) => {
+        baseRingGear.rotation.y = t * 1.8 * dir;
+      });
+
+      // Vertical central drive column from bottom ring gear to upper mechanism
+      makeMesh(new THREE.CylinderGeometry(0.14, 0.14, 1.7, 12), mats.secondary, mats.edge, group);
+
+      if (type === 'gear') {
+        const mainGear = buildSpurGear(0.95, 0.34, 14, mats.primary, mats.edge);
+        mainGear.rotation.x = Math.PI / 2;
+        group.add(mainGear);
+
+        const topPinion = buildSpurGear(0.45, 0.3, 8, mats.secondary, mats.edge);
+        topPinion.rotation.x = Math.PI / 2;
+        topPinion.position.set(0, 1.3, 0);
+        group.add(topPinion);
+
+        animators.push((t) => {
+          mainGear.rotation.z = t * 1.8 * dir;
+          topPinion.rotation.z = -t * 3.6 * dir;
+        });
+
+      } else if (type === 'conveyor') {
+        const len = 1.9;
+        makeMesh(new THREE.BoxGeometry(len, 0.16, 0.92), mats.secondary, mats.edge, group);
+
+        const rL = buildSpurGear(0.32, 0.88, 10, mats.primary, mats.edge);
+        rL.rotation.x = Math.PI / 2;
+        rL.position.set(-len / 2, 0, 0);
+        group.add(rL);
+
+        const rR = buildSpurGear(0.32, 0.88, 10, mats.primary, mats.edge);
+        rR.rotation.x = Math.PI / 2;
+        rR.position.set(len / 2, 0, 0);
+        group.add(rR);
+
+        const parcels = [];
+        for (let i = 0; i < 3; i++) {
+          const p = makeMesh(new THREE.BoxGeometry(0.28, 0.24, 0.42), mats.primary, mats.edge, group);
+          parcels.push({ mesh: p, offset: i / 3 });
+        }
+
+        animators.push((t) => {
+          rL.rotation.z = -t * 2.5;
+          rR.rotation.z = -t * 2.5;
+          parcels.forEach((p) => {
+            const u = (t * 0.48 + p.offset) % 1;
+            p.mesh.position.set(-len / 2 + u * len, 0.24, 0);
+          });
+        });
+
+      } else if (type === 'turbine') {
+        const stages = [];
+        for (let s = -1; s <= 1; s++) {
+          const st = buildSpurGear(0.86 - Math.abs(s) * 0.1, 0.2, 16, mats.primary, mats.edge);
+          st.rotation.z = Math.PI / 2;
+          st.position.x = s * 0.36;
+          group.add(st);
+          stages.push({ mesh: st, dir: s % 2 === 0 ? 1 : -1 });
+        }
+        const shroud = makeMesh(new THREE.CylinderGeometry(1.02, 1.02, 1.05, 24, 1, true), mats.secondary, mats.edge, group);
+        shroud.rotation.z = Math.PI / 2;
+
+        animators.push((t) => {
+          stages.forEach((st, i) => {
+            st.mesh.rotation.x = t * (3.2 + i * 0.4) * st.dir;
+          });
+        });
+
+      } else if (type === 'pistons') {
+        const bank = new THREE.Group();
+        group.add(bank);
+        const rods = [];
+        for (let i = -1; i <= 1; i++) {
+          const cyl = makeMesh(new THREE.CylinderGeometry(0.24, 0.24, 0.65, 14), mats.secondary, mats.edge, bank);
+          cyl.position.set(i * 0.56, 0.72, 0);
+          const head = makeMesh(new THREE.CylinderGeometry(0.18, 0.18, 0.55, 12), mats.primary, mats.edge, bank);
+          head.position.set(i * 0.56, 0.3, 0);
+          const crankGear = buildSpurGear(0.26, 0.18, 8, mats.primary, mats.edge);
+          crankGear.rotation.x = Math.PI / 2;
+          crankGear.position.set(i * 0.56, 0, 0);
+          bank.add(crankGear);
+          rods.push({ head, crankGear, phase: i * 2.1 });
+        }
+        animators.push((t) => {
+          rods.forEach((r) => {
+            r.crankGear.rotation.z = t * 3.0 * dir;
+            r.head.position.y = 0.42 + Math.sin(t * 3.8 + r.phase) * 0.24;
+          });
+        });
+
+      } else if (type === 'gyro') {
+        const outer = makeMesh(new THREE.TorusGeometry(0.98, 0.06, 12, 32), mats.primary, mats.edge, group);
+        const mid = makeMesh(new THREE.TorusGeometry(0.7, 0.055, 12, 28), mats.secondary, mats.edge, group);
+        const core = makeMesh(new THREE.OctahedronGeometry(0.34, 0), mats.primary, mats.edge, group);
+        animators.push((t) => {
+          outer.rotation.y = t * 1.4 * dir;
+          mid.rotation.x = t * 2.1;
+          mid.rotation.z = t * 1.1;
+          core.rotation.y = -t * 2.8;
+        });
+
+      } else if (type === 'valve') {
+        makeMesh(new THREE.BoxGeometry(1.3, 1.45, 0.42), mats.secondary, mats.edge, group);
+        const jawTop = makeMesh(new THREE.BoxGeometry(0.95, 0.36, 0.5), mats.primary, mats.edge, group);
+        const jawBot = makeMesh(new THREE.BoxGeometry(0.95, 0.36, 0.5), mats.primary, mats.edge, group);
+        animators.push((t) => {
+          const open = 0.22 + Math.abs(Math.sin(t * 2.6)) * 0.32;
+          jawTop.position.y = open;
+          jawBot.position.y = -open;
+        });
+
+      } else if (type === 'drum') {
+        const drum = buildSpurGear(0.84, 0.9, 12, mats.primary, mats.edge);
+        drum.rotation.x = Math.PI / 2;
+        group.add(drum);
+        animators.push((t) => {
+          drum.rotation.z = t * 1.6 * dir;
+        });
+
+      } else {
+        const cams = [];
+        for (let i = -2; i <= 2; i++) {
+          const lobe = makeMesh(new THREE.CylinderGeometry(0.24, 0.24, 0.14, 16), mats.primary, mats.edge, group);
+          lobe.rotation.z = Math.PI / 2;
+          lobe.position.set(i * 0.32, 0, 0);
+          const follower = makeMesh(new THREE.BoxGeometry(0.14, 0.58, 0.14), mats.secondary, mats.edge, group);
+          follower.position.set(i * 0.32, 0.52, 0);
+          cams.push({ lobe, follower, phase: i * 0.9 });
+        }
+        animators.push((t) => {
+          cams.forEach((c) => {
+            const lift = Math.sin(t * 3.5 + c.phase) * 0.18;
+            c.lobe.position.y = lift * 0.5;
+            c.follower.position.y = 0.52 + lift;
+          });
+        });
+      }
+
+      return { group, animators };
+    }
+
+    /**
+     * ============================================================================
+     * 7. NON-LINEAR 2D CLUSTER ASSEMBLY (MESHING TRANSFER GEARS + SHAFTS)
+     * ============================================================================
+     */
+    const machineRoot = new THREE.Group();
+    scene.add(machineRoot);
+
+    let activeAnimators = [];
+    let partNodes = []; // { index, group, hitMesh, labelEl }
+
+    function rebuildMachine3D() {
+      while (machineRoot.children.length > 0) {
+        machineRoot.remove(machineRoot.children[0]);
+      }
+      labelsLayer.innerHTML = '';
+      activeAnimators = [];
+      partNodes = [];
+
+      if (machineParts.length === 0) return;
+
+      const frameMats = createPartMaterials(null, false);
+
+      // 1. Place each component at its (x, z) coordinate
+      machineParts.forEach((part, idx) => {
+        if (typeof part.x !== 'number' || typeof part.z !== 'number') {
+          layoutCluster2D(machineParts);
+        }
+
+        const isSel = idx === selectedIdx && !isViewerOnly;
+        const mats = createPartMaterials(part.color, isSel);
+        const built = createMechanismMesh(part.type, mats, idx);
+
+        built.group.position.set(part.x, 0, part.z);
+
+        // Support pedestal to floor
+        const pedestal = makeMesh(new THREE.BoxGeometry(0.75, 0.9, 0.75), frameMats.secondary, frameMats.edge);
+        pedestal.position.set(part.x, -0.95, part.z);
+        machineRoot.add(pedestal);
+
+        // Invisible hit collider for clicking/dragging
+        const hitBox = new THREE.Mesh(
+          new THREE.BoxGeometry(2.1, 2.3, 2.1),
+          new THREE.MeshBasicMaterial({ visible: false })
+        );
+        hitBox.userData = { partIndex: idx };
+        built.group.add(hitBox);
+
+        machineRoot.add(built.group);
+        activeAnimators.push(...built.animators);
+
+        // Minimal Floating Tag
+        const tag = document.createElement('div');
+        tag.className = `part-tag ${isSel ? 'selected' : ''}`;
+        const dotColor = part.color || (isDarkPolarity ? '#f0efeb' : '#141413');
+        tag.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:${dotColor};"></span>
+          <span>${part.name}</span>
+        `;
+        tag.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (isViewerOnly) return;
+          openPopupForPart(idx, e.clientX, e.clientY);
+        });
+        labelsLayer.appendChild(tag);
+
+        partNodes.push({
+          index: idx,
+          group: built.group,
+          hitMesh: hitBox,
+          labelEl: tag
+        });
+      });
+
+      // 2. Connect every component in the 2D cluster to its nearest neighbor (Spanning Tree)
+      if (machineParts.length > 1) {
+        const connected = new Set([0]);
+        const edges = [];
+
+        while (connected.size < machineParts.length) {
+          let bestFrom = -1;
+          let bestTo = -1;
+          let bestDist = Infinity;
+
+          connected.forEach((i) => {
+            for (let j = 0; j < machineParts.length; j++) {
+              if (connected.has(j)) continue;
+              const dx = machineParts[j].x - machineParts[i].x;
+              const dz = machineParts[j].z - machineParts[i].z;
+              const d = Math.hypot(dx, dz);
+              if (d < bestDist) {
+                bestDist = d;
+                bestFrom = i;
+                bestTo = j;
+              }
+            }
+          });
+
+          if (bestTo !== -1) {
+            connected.add(bestTo);
+            edges.push([bestFrom, bestTo]);
+          } else {
+            break;
+          }
+        }
+
+        edges.forEach(([i, j], edgeIdx) => {
+          const pA = machineParts[i];
+          const pB = machineParts[j];
+          const dx = pB.x - pA.x;
+          const dz = pB.z - pA.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < 0.2) return;
+
+          const midX = (pA.x + pB.x) / 2;
+          const midZ = (pA.z + pB.z) / 2;
+          const angle = Math.atan2(dz, dx);
+
+          // Structural lower chassis tie beam
+          const beam = makeMesh(new THREE.BoxGeometry(dist, 0.12, 0.36), frameMats.secondary, frameMats.edge);
+          beam.position.set(midX, -1.15, midZ);
+          beam.rotation.y = -angle;
+          machineRoot.add(beam);
+
+          // Spinning universal coupling shaft between the two units
+          const shaftGroup = new THREE.Group();
+          shaftGroup.position.set(midX, -0.45, midZ);
+          shaftGroup.rotation.y = -angle;
+          machineRoot.add(shaftGroup);
+
+          const rod = makeMesh(new THREE.CylinderGeometry(0.065, 0.065, dist, 10), frameMats.secondary, frameMats.edge, shaftGroup);
+          rod.rotation.z = Math.PI / 2;
+
+          // Meshing horizontal transfer gear right at the midpoint
+          const idlerRadius = Math.max(0.36, Math.min(0.72, (dist - 1.65) * 0.5));
+          const idlerGear = buildSpurGear(idlerRadius, 0.18, 12, frameMats.primary, frameMats.edge);
+          idlerGear.position.set(midX, -0.85, midZ);
+          machineRoot.add(idlerGear);
+
+          const dir = edgeIdx % 2 === 0 ? -1 : 1;
+          activeAnimators.push((t) => {
+            rod.rotation.x = t * 2.4 * dir;
+            idlerGear.rotation.y = t * 2.2 * dir;
+          });
+        });
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 8. CONTEXTUAL POPUP BUILDER MENU (ON PART CLICK OR FLOOR GRID CLICK)
+     * ============================================================================
+     */
+    const partPopup = document.getElementById('part-popup');
+    const popupBadge = document.getElementById('popup-context-badge');
+    const partNameInput = document.getElementById('part-name-input');
+    const partsGridEl = document.getElementById('parts-grid');
+    const swatchRowEl = document.getElementById('swatch-row');
+    const btnModeAppend = document.getElementById('btn-mode-append');
+    const btnModeSwap = document.getElementById('btn-mode-swap');
+    const btnDeletePart = document.getElementById('btn-delete-part');
+
+    function positionPopupNear(clientX, clientY) {
+      partPopup.classList.remove('hidden');
+      const pw = 360;
+      const ph = 290;
+      const x = Math.max(12, Math.min(window.innerWidth - pw - 12, clientX - pw / 2));
+      const y = Math.max(58, Math.min(window.innerHeight - ph - 12, clientY + 18));
+      partPopup.style.left = `${x}px`;
+      partPopup.style.top = `${y}px`;
+    }
+
+    function openPopupForPart(idx, clientX, clientY) {
+      selectedIdx = idx;
+      paletteClickMode = 'swap';
+      rebuildMachine3D();
+      renderPopupContent();
+      positionPopupNear(clientX || window.innerWidth / 2, clientY || window.innerHeight - 320);
+    }
+
+    function openPopupForGridPoint(worldPt, clientX, clientY) {
+      pendingGridPoint = {
+        x: Number(Math.max(-9, Math.min(9, worldPt.x)).toFixed(2)),
+        z: Number(Math.max(-9, Math.min(9, worldPt.z)).toFixed(2))
+      };
+      paletteClickMode = 'append';
+      renderPopupContent();
+      positionPopupNear(clientX, clientY);
+    }
+
+    function renderPopupContent() {
+      const currentPart = machineParts[selectedIdx] || machineParts[0];
+
+      if (paletteClickMode === 'append') {
+        popupBadge.textContent = 'BUILD AT GRID';
+        btnModeAppend.classList.add('active');
+        btnModeSwap.classList.remove('active');
+        partNameInput.value = currentPart ? currentPart.name : 'new-module';
+      } else {
+        popupBadge.textContent = `PART 0${selectedIdx + 1}`;
+        btnModeSwap.classList.add('active');
+        btnModeAppend.classList.remove('active');
+        if (currentPart) partNameInput.value = currentPart.name;
+      }
+
+      btnDeletePart.style.display = machineParts.length > 1 ? 'inline-flex' : 'none';
+
+      // Render 8 Pre-Built Moving Parts
+      partsGridEl.innerHTML = '';
+      MECHANISM_PARTS.forEach((m) => {
+        const isCurrent = paletteClickMode === 'swap' && currentPart && currentPart.type === m.type;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `part-tile ${isCurrent ? 'active-type' : ''}`;
+        btn.innerHTML = `
+          <span class="font-display text-[11px] font-semibold leading-tight">${m.label}</span>
+          <span class="font-mono-tech text-[9px] opacity-70">${m.sub}</span>
+        `;
+        btn.addEventListener('click', () => {
+          if (paletteClickMode === 'swap' && currentPart) {
+            currentPart.type = m.type;
+          } else {
+            const newPart = {
+              id: 'p_' + Date.now(),
+              name: m.label,
+              type: m.type,
+              color: null,
+              x: pendingGridPoint.x,
+              z: pendingGridPoint.z
+            };
+            machineParts.push(newPart);
+            selectedIdx = machineParts.length - 1;
+            paletteClickMode = 'swap';
+          }
+          rebuildMachine3D();
+          renderPopupContent();
+        });
+        partsGridEl.appendChild(btn);
+      });
+
+      // Render Optional Color Swatches
+      swatchRowEl.innerHTML = '';
+      OPTIONAL_SWATCHES.forEach((hex) => {
+        const sw = document.createElement('button');
+        sw.type = 'button';
+        sw.className = `swatch ${currentPart && currentPart.color === hex ? 'active' : ''}`;
+        sw.style.backgroundColor = hex;
+        sw.addEventListener('click', () => {
+          if (!currentPart) return;
+          currentPart.color = hex;
+          rebuildMachine3D();
+          renderPopupContent();
+        });
+        swatchRowEl.appendChild(sw);
+      });
+    }
+
+    partNameInput.addEventListener('input', (e) => {
+      if (machineParts[selectedIdx]) {
+        machineParts[selectedIdx].name = e.target.value || 'module';
+        if (partNodes[selectedIdx]) {
+          const span = partNodes[selectedIdx].labelEl.querySelector('span:last-child');
+          if (span) span.textContent = machineParts[selectedIdx].name;
+        }
+      }
+    });
+
+    btnModeAppend.addEventListener('click', () => {
+      paletteClickMode = 'append';
+      if (machineParts[selectedIdx]) {
+        const angle = Math.random() * Math.PI * 2;
+        pendingGridPoint = {
+          x: Number((machineParts[selectedIdx].x + Math.cos(angle) * 2.8).toFixed(2)),
+          z: Number((machineParts[selectedIdx].z + Math.sin(angle) * 2.8).toFixed(2))
+        };
+      }
+      renderPopupContent();
+    });
+
+    btnModeSwap.addEventListener('click', () => {
+      paletteClickMode = 'swap';
+      renderPopupContent();
+    });
+
+    document.getElementById('btn-color-mono').addEventListener('click', () => {
+      if (machineParts[selectedIdx]) {
+        machineParts[selectedIdx].color = null;
+        rebuildMachine3D();
+        renderPopupContent();
+      }
+    });
+
+    btnDeletePart.addEventListener('click', () => {
+      if (machineParts.length <= 1) return;
+      machineParts.splice(selectedIdx, 1);
+      selectedIdx = Math.max(0, selectedIdx - 1);
+      rebuildMachine3D();
+      renderPopupContent();
+    });
+
+    document.getElementById('btn-close-popup').addEventListener('click', () => {
+      partPopup.classList.add('hidden');
+    });
+
+    /**
+     * ============================================================================
+     * 9. CAMERA ORBIT, PART DRAGGING, & FLOOR GRID CLICK HANDLER
+     * ============================================================================
+     */
+    let camTheta = 0.45;
+    let camPhi = 0.88;
+    let camRadius = 14.5;
+    const camTarget = new THREE.Vector3(0, -0.2, 0);
+
+    const raycaster = new THREE.Raycaster();
+    const pointerNDC = new THREE.Vector2();
+
+    let isOrbiting = false;
+    let isDraggingPart = false;
+    let draggedPartIdx = -1;
+    let pointerDownPos = { x: 0, y: 0 };
+    let prevPointerPos = { x: 0, y: 0 };
+
+    const wrapper = document.getElementById('canvas-wrapper');
+
+    wrapper.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.part-tag')) return;
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      prevPointerPos = { x: e.clientX, y: e.clientY };
+
+      const rect = canvas.getBoundingClientRect();
+      pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointerNDC, camera);
+
+      const hits = raycaster.intersectObjects(partNodes.map(n => n.hitMesh), false);
+      if (hits.length > 0 && !isViewerOnly) {
+        draggedPartIdx = hits[0].object.userData.partIndex;
+        selectedIdx = draggedPartIdx;
+        isDraggingPart = true;
+      } else {
+        isOrbiting = true;
+      }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      const dx = e.clientX - prevPointerPos.x;
+      const dy = e.clientY - prevPointerPos.y;
+      prevPointerPos = { x: e.clientX, y: e.clientY };
+
+      if (isDraggingPart && draggedPartIdx !== -1 && !isViewerOnly) {
+        const movedDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+        if (movedDist > 5) {
+          const rect = canvas.getBoundingClientRect();
+          pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(pointerNDC, camera);
+          const planeHit = raycaster.intersectObject(floorHitPlane);
+          if (planeHit.length > 0) {
+            const pt = planeHit[0].point;
+            machineParts[draggedPartIdx].x = Number(Math.max(-10, Math.min(10, pt.x)).toFixed(2));
+            machineParts[draggedPartIdx].z = Number(Math.max(-10, Math.min(10, pt.z)).toFixed(2));
+            rebuildMachine3D();
+          }
+        }
+      } else if (isOrbiting) {
+        camTheta -= dx * 0.0065;
+        camPhi = Math.max(0.28, Math.min(1.42, camPhi - dy * 0.0055));
+      }
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      const distMoved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+
+      if (distMoved < 6 && e.target === canvas && !isViewerOnly) {
+        const rect = canvas.getBoundingClientRect();
+        pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointerNDC, camera);
+
+        const partHits = raycaster.intersectObjects(partNodes.map(n => n.hitMesh), false);
+        if (partHits.length > 0) {
+          const idx = partHits[0].object.userData.partIndex;
+          openPopupForPart(idx, e.clientX, e.clientY);
+        } else {
+          const gridHits = raycaster.intersectObject(floorHitPlane);
+          if (gridHits.length > 0) {
+            openPopupForGridPoint(gridHits[0].point, e.clientX, e.clientY);
+          }
+        }
+      }
+
+      isOrbiting = false;
+      isDraggingPart = false;
+      draggedPartIdx = -1;
+    });
+
+    wrapper.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      camRadius = Math.max(6.5, Math.min(28, camRadius + e.deltaY * 0.012));
+    }, { passive: false });
+
+    /**
+     * ============================================================================
+     * 10. TOP BAR CONTROLS (SCRATCH, X-RAY, THEME, VIEWER DOWNLOAD & SHARE)
+     * ============================================================================
+     */
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.add('hidden'), 2800);
+    }
+
+    document.getElementById('btn-clear-scratch').addEventListener('click', () => {
+      machineTitle = 'Custom Machine';
+      document.getElementById('machine-title').textContent = machineTitle;
+      machineParts = [
+        { id: 'p_root', name: 'Primary Drive Core', type: 'gear', color: null, x: 0, z: 0 }
+      ];
+      selectedIdx = 0;
+      rebuildMachine3D();
+      openPopupForPart(0, window.innerWidth / 2, window.innerHeight - 310);
+    });
+
+    const btnWireframe = document.getElementById('btn-wireframe');
+    btnWireframe.addEventListener('click', () => {
+      isWireframe = !isWireframe;
+      btnWireframe.classList.toggle('active', isWireframe);
+      rebuildMachine3D();
+    });
+
+    const btnTheme = document.getElementById('btn-theme');
+    function applyPolarityUI() {
+      document.body.classList.toggle('dark-polarity', isDarkPolarity);
+      btnTheme.classList.toggle('active', isDarkPolarity);
+      btnTheme.textContent = isDarkPolarity ? 'DARK' : 'LIGHT';
+      const bgHex = isDarkPolarity ? 0x0d0d0c : 0xf2f1ed;
+      scene.background.setHex(bgHex);
+      scene.fog.color.setHex(bgHex);
+      rebuildFloor();
+      rebuildMachine3D();
+    }
+
+    btnTheme.addEventListener('click', () => {
+      isDarkPolarity = !isDarkPolarity;
+      applyPolarityUI();
+    });
+
+    // DOWNLOAD HTML (Viewer-Only Mode: hides +COMPILE, SCRATCH, Tutorial, and Part Builder)
+    document.getElementById('btn-download-html').addEventListener('click', () => {
+      const exportPayload = {
+        title: machineTitle,
+        parts: machineParts,
+        dark: isDarkPolarity,
+        xray: isWireframe,
+        viewerOnly: true
+      };
+      let htmlSource = document.documentElement.outerHTML;
+      const replacement = `/*__EXPORTED_STATE_START__*/\n    const EXPORTED_STATE = ${JSON.stringify(exportPayload)};\n    /*__EXPORTED_STATE_END__*/`;
+      htmlSource = htmlSource.replace(/\/\*__EXPORTED_STATE_START__\*\/[\s\S]*?\/\*__EXPORTED_STATE_END__\*\//, replacement);
+
+      const blob = new Blob(['<!DOCTYPE html>\n' + htmlSource], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${machineTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-machine.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('DOWNLOADED VIEWER-ONLY HTML');
+    });
+
+    // SHARE LINK (Compressed URL with viewerOnly flag `v: 1`)
+    document.getElementById('btn-share-link').addEventListener('click', async () => {
+      const compact = {
+        t: machineTitle,
+        d: isDarkPolarity ? 1 : 0,
+        x: isWireframe ? 1 : 0,
+        v: 1,
+        p: machineParts.map(p => [p.name, p.type, p.color || 0, p.x, p.z])
+      };
+      const token = await compressToUrlHash(compact);
+      const shareUrl = `${window.location.origin}${window.location.pathname}#m=${token}`;
+
+      const tempInput = document.createElement('textarea');
+      tempInput.value = shareUrl;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+
+      showToast('VIEWER SHARE LINK COPIED TO CLIPBOARD');
+    });
+
+    /**
+     * ============================================================================
+     * 11. AUTO-COMPILER MODAL (PARSE PDF OR SPEC INTO ACTUAL PROJECT PARTS)
+     * ============================================================================
+     */
+    const compilerModal = document.getElementById('compiler-modal');
+    const compileStatus = document.getElementById('compile-status');
+    const compileSpecInput = document.getElementById('compile-spec-input');
+    const compileTitleInput = document.getElementById('compile-title-input');
+
+    document.getElementById('btn-open-compiler').addEventListener('click', () => {
+      compilerModal.classList.remove('hidden');
+      compilerModal.classList.add('flex');
+    });
+
+    document.getElementById('btn-close-compiler').addEventListener('click', () => {
+      compilerModal.classList.add('hidden');
+      compilerModal.classList.remove('flex');
+    });
+
+    document.getElementById('file-upload-input').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      compileStatus.textContent = `READING ${file.name.toUpperCase()}...`;
+      if (!compileTitleInput.value) {
+        compileTitleInput.value = file.name.replace(/\.[^.]+$/, '');
+      }
+      try {
+        if (file.name.toLowerCase().endsWith('.pdf') && window.pdfjsLib) {
+          const buf = await file.arrayBuffer();
+          const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+          let extracted = '';
+          for (let i = 1; i <= Math.min(pdf.numPages, 12); i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            extracted += content.items.map(it => it.str).join(' ') + '\n';
+          }
+          compileSpecInput.value = extracted.trim();
+        } else {
+          compileSpecInput.value = await file.text();
+        }
+        compileStatus.textContent = 'DOCUMENT PARSED';
+      } catch (err) {
+        compileStatus.textContent = 'PARSE ERROR';
+      }
+    });
+
+    function inferTypeFromText(line, idx) {
+      const s = line.toLowerCase();
+      if (s.includes('auth') || s.includes('jwt') || s.includes('gate') || s.includes('lock')) return 'valve';
+      if (s.includes('loop') || s.includes('core') || s.includes('kernel') || s.includes('agent')) return 'gyro';
+      if (s.includes('llm') || s.includes('gpt') || s.includes('gemini') || s.includes('claude') || s.includes('openai') || s.includes('openrouter') || s.includes('model') || s.includes('needle')) return 'turbine';
+      if (s.includes('tool') || s.includes('embedded') || s.includes('database') || s.includes('piston') || s.includes('search')) return 'pistons';
+      if (s.includes('stream') || s.includes('sse') || s.includes('postgres') || s.includes('conveyor') || s.includes('ingest')) return 'conveyor';
+      if (s.includes('sandbox') || s.includes('wal') || s.includes('ring') || s.includes('store') || s.includes('bbolt')) return 'drum';
+      if (s.includes('hash') || s.includes('clock') || s.includes('hlc') || s.includes('thimble')) return 'cam';
+      return MECHANISM_PARTS[idx % MECHANISM_PARTS.length].type;
+    }
+
+    document.getElementById('btn-run-compile').addEventListener('click', () => {
+      const raw = compileSpecInput.value.trim();
+      if (!raw) return;
+
+      const lines = raw
+        .split(/\n+/)
+        .map(l => l.replace(/^[-*•\d.)\s]+/, '').trim())
+        .filter(l => l.length >= 3 && l.length <= 95);
+
+      const chosen = lines.slice(0, 8);
+      if (chosen.length === 0) return;
+
+      machineTitle = compileTitleInput.value.trim() || 'Compiled System';
+      document.getElementById('machine-title').textContent = machineTitle;
+
+      machineParts = chosen.map((line, idx) => {
+        const cleanName = line.split(/[:—–-]/)[0].trim().slice(0, 32);
+        return {
+          id: 'p_comp_' + idx,
+          name: cleanName || `module-${idx + 1}`,
+          type: inferTypeFromText(line, idx),
+          color: null,
+          x: 0,
+          z: 0
+        };
+      });
+
+      layoutCluster2D(machineParts);
+      selectedIdx = 0;
+      rebuildMachine3D();
+      compilerModal.classList.add('hidden');
+      compilerModal.classList.remove('flex');
+    });
+
+    /**
+     * ============================================================================
+     * 12. SINGLE-WINDOW SPOTLIGHT TUTORIAL (FIRST-TIME VISIT ONLY)
+     * ============================================================================
+     */
+    const TUTORIAL_STEPS = [
+      {
+        targetId: 'brand-chip',
+        title: 'Click Parts or the Floor Grid',
+        body: 'Click any spinning 3D part to swap its mechanism, recolor it, or drag it across the floor. Click any empty spot on the floor grid to pop up the part menu and add a new meshing unit.',
+        pos: { top: '54px', left: '14px', right: 'auto' }
+      },
+      {
+        targetId: 'btn-open-compiler',
+        title: '+ COMPILE Spec or PDF',
+        body: 'Upload a technical brief PDF or paste system architecture notes to automatically compile your project into an interlocking 3D machine.',
+        pos: { top: '54px', left: '160px', right: 'auto' }
+      },
+      {
+        targetId: 'btn-clear-scratch',
+        title: 'SCRATCH Builder',
+        body: 'Clear the canvas down to a single central drive gear so you can assemble a custom kinetic machine from scratch.',
+        pos: { top: '54px', left: '245px', right: 'auto' }
+      },
+      {
+        targetId: 'btn-wireframe',
+        title: 'X-Ray & Dark Mode Defaults',
+        body: 'X-Ray blueprint and Dark Mode are active by default. Click X-RAY or DARK/LIGHT anytime to switch to solid CAD shading or Studio Light mode.',
+        pos: { top: '54px', left: 'auto', right: '140px' }
+      },
+      {
+        targetId: 'btn-share-link',
+        title: '↓ DOWNLOAD & ⇄ SHARE LINK',
+        body: 'Export a standalone HTML file or copy a compressed URL. Both open in a clean, read-only viewer without builder buttons or this tutorial.',
+        pos: { top: '54px', left: 'auto', right: '14px' }
+      }
+    ];
+
+    let tutorialStepIndex = 0;
+    const tutorialWindowEl = document.getElementById('tutorial-window');
+    const tutorialStepBadgeEl = document.getElementById('tutorial-step-badge');
+    const tutorialTitleEl = document.getElementById('tutorial-title');
+    const tutorialBodyEl = document.getElementById('tutorial-body');
+    const tutorialDotsEl = document.getElementById('tutorial-dots');
+    const btnTutorialPrev = document.getElementById('btn-tutorial-prev');
+    const btnTutorialNext = document.getElementById('btn-tutorial-next');
+
+    function hasSeenTutorial() {
+      return document.cookie.includes('km_tour_done=1') || window.name.includes('km_tour_done');
+    }
+
+    function markTutorialSeen() {
+      document.cookie = 'km_tour_done=1; path=/; max-age=31536000; SameSite=Lax';
+      if (!window.name.includes('km_tour_done')) {
+        window.name += '|km_tour_done';
+      }
+    }
+
+    function clearTutorialHighlights() {
+      document.querySelectorAll('.tutorial-highlight').forEach(el => {
+        el.classList.remove('tutorial-highlight');
+      });
+    }
+
+    function renderTutorialStep() {
+      if (isViewerOnly) {
+        closeTutorial();
+        return;
+      }
+      clearTutorialHighlights();
+      const step = TUTORIAL_STEPS[tutorialStepIndex];
+      if (!step) return;
+
+      tutorialWindowEl.classList.remove('hidden');
+      tutorialStepBadgeEl.textContent = `STEP ${tutorialStepIndex + 1} OF ${TUTORIAL_STEPS.length}`;
+      tutorialTitleEl.textContent = step.title;
+      tutorialBodyEl.textContent = step.body;
+
+      // Position single floating window near the highlighted button
+      tutorialWindowEl.style.top = step.pos.top;
+      tutorialWindowEl.style.left = step.pos.left;
+      tutorialWindowEl.style.right = step.pos.right;
+
+      // Light up target button
+      const targetEl = document.getElementById(step.targetId);
+      if (targetEl) {
+        targetEl.classList.add('tutorial-highlight');
+      }
+
+      // Render progress dots
+      tutorialDotsEl.innerHTML = '';
+      TUTORIAL_STEPS.forEach((_, idx) => {
+        const dot = document.createElement('span');
+        dot.className = 'w-1.5 h-1.5 rounded-full transition-all';
+        dot.style.background = idx === tutorialStepIndex ? 'var(--text-primary)' : 'var(--border-hairline)';
+        tutorialDotsEl.appendChild(dot);
+      });
+
+      btnTutorialPrev.style.visibility = tutorialStepIndex === 0 ? 'hidden' : 'visible';
+      btnTutorialNext.textContent = tutorialStepIndex === TUTORIAL_STEPS.length - 1 ? 'GOT IT ✓' : 'NEXT →';
+    }
+
+    function closeTutorial() {
+      clearTutorialHighlights();
+      tutorialWindowEl.classList.add('hidden');
+      markTutorialSeen();
+    }
+
+    btnTutorialPrev.addEventListener('click', () => {
+      if (tutorialStepIndex > 0) {
+        tutorialStepIndex--;
+        renderTutorialStep();
+      }
+    });
+
+    btnTutorialNext.addEventListener('click', () => {
+      if (tutorialStepIndex < TUTORIAL_STEPS.length - 1) {
+        tutorialStepIndex++;
+        renderTutorialStep();
+      } else {
+        closeTutorial();
+      }
+    });
+
+    document.getElementById('btn-tutorial-skip').addEventListener('click', closeTutorial);
+    document.getElementById('btn-help-tour').addEventListener('click', () => {
+      tutorialStepIndex = 0;
+      renderTutorialStep();
+    });
+
+    /**
+     * ============================================================================
+     * 13. ANIMATION LOOP & LABEL PROJECTION
+     * ============================================================================
+     */
+    const clock = new THREE.Clock();
+    const projVec = new THREE.Vector3();
+
+    function updateLabels() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      partNodes.forEach((node) => {
+        node.group.getWorldPosition(projVec);
+        projVec.y += 1.45;
+        projVec.project(camera);
+
+        if (projVec.z > 1) {
+          node.labelEl.style.display = 'none';
+          return;
+        }
+        node.labelEl.style.display = 'inline-flex';
+        const x = Math.max(54, Math.min(w - 54, (projVec.x * 0.5 + 0.5) * w));
+        const y = Math.max(50, Math.min(h - 30, (-(projVec.y * 0.5) + 0.5) * h));
+        node.labelEl.style.left = `${x}px`;
+        node.labelEl.style.top = `${y}px`;
+      });
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+
+      activeAnimators.forEach(fn => fn(elapsed));
+
+      camera.position.x = camTarget.x + camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+      camera.position.y = camTarget.y + camRadius * Math.cos(camPhi);
+      camera.position.z = camTarget.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+      camera.lookAt(camTarget);
+
+      renderer.render(scene, camera);
+      updateLabels();
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    window.onload = async function () {
+      await hydrateInitialState();
+      applyPolarityUI();
+      btnWireframe.classList.toggle('active', isWireframe);
+      rebuildFloor();
+      rebuildMachine3D();
+      requestAnimationFrame(animate);
+
+      // Show the single-window spotlight tutorial on first open (never in viewer-only download/share mode)
+      if (!isViewerOnly && !hasSeenTutorial()) {
+        setTimeout(() => {
+          tutorialStepIndex = 0;
+          renderTutorialStep();
+        }, 400);
+      }
+    };
+  </script>
+</body>
+</html>
