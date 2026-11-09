@@ -2038,45 +2038,202 @@
 
     /**
      * ============================================================================
-     * 13. ANIMATION LOOP & LABEL PROJECTION
+     * 13. ANIMATION LOOP, DIAGRAM INTERPOLATION, & LIVE 3D COMPONENT PREVIEWS
      * ============================================================================
      */
     const clock = new THREE.Clock();
     const projVec = new THREE.Vector3();
 
-    function updateLabels() {
+    function evalCubicBezier(p0, p1, p2, p3, t) {
+      const u = 1 - t;
+      return (u * u * u * p0) + (3 * u * u * t * p1) + (3 * u * t * t * p2) + (t * t * t * p3);
+    }
+
+    function computeDiagramTargetCoord(idx, total, w, h) {
+      const topPad = 94;
+      const botPad = h - 42;
+      const cx = w * 0.5;
+      const cy = (topPad + botPad) * 0.5;
+      const spanX = Math.max(140, w * 0.36);
+      const spanY = Math.max(105, (botPad - topPad) * 0.38);
+
+      if (total <= 1 || idx === 0) {
+        return { x: cx, y: cy };
+      }
+
+      // Arrange peripheral components cleanly around the central hub (idx 0)
+      const ringCount = total - 1;
+      const ringIdx = idx - 1;
+      const angle = (ringIdx / ringCount) * Math.PI * 2 - Math.PI * 0.75;
+      return {
+        x: cx + Math.cos(angle) * spanX,
+        y: cy + Math.sin(angle) * spanY
+      };
+    }
+
+    function updateLabels(elapsed) {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      partNodes.forEach((node) => {
+      const total = partNodes.length;
+
+      partNodes.forEach((node, idx) => {
+        const part = machineParts[idx];
         node.group.getWorldPosition(projVec);
         projVec.y += 1.45;
         projVec.project(camera);
 
-        if (projVec.z > 1) {
+        const cardW = node.labelEl.offsetWidth || (isDiagramMode ? 248 : 130);
+        const cardH = node.labelEl.offsetHeight || (isDiagramMode ? 118 : 26);
+        const padX = cardW * 0.5 + 14;
+        const padY = cardH * 0.5 + 14;
+
+        // 1. 3D Machine projected coordinate
+        let x3D = Math.max(54, Math.min(w - 54, (projVec.x * 0.5 + 0.5) * w));
+        let y3D = Math.max(50, Math.min(h - 30, (-(projVec.y * 0.5) + 0.5) * h));
+
+        // 2. 2D Schematic Diagram target coordinate
+        const diagBase = computeDiagramTargetCoord(idx, total, w, h);
+        let xDiag = diagBase.x + (part && part.diagDragX ? part.diagDragX : 0);
+        let yDiag = diagBase.y + (part && part.diagDragY ? part.diagDragY : 0);
+        xDiag = Math.max(padX, Math.min(w - padX, xDiag));
+        yDiag = Math.max(76 + cardH * 0.5, Math.min(h - padY, yDiag));
+
+        // 3. Smoothly interpolate between 3D Machine and 2D Schematic Diagram
+        const sx = x3D + (xDiag - x3D) * diagramTransition;
+        const sy = y3D + (yDiag - y3D) * diagramTransition;
+
+        node.currentScreenX = sx;
+        node.currentScreenY = sy;
+        node.halfW = cardW * 0.5;
+        node.halfH = cardH * 0.5;
+
+        if (projVec.z > 1 && diagramTransition < 0.05) {
           node.labelEl.style.display = 'none';
           return;
         }
         node.labelEl.style.display = 'inline-flex';
-        const x = Math.max(54, Math.min(w - 54, (projVec.x * 0.5 + 0.5) * w));
-        const y = Math.max(50, Math.min(h - 30, (-(projVec.y * 0.5) + 0.5) * h));
-        node.labelEl.style.left = `${x}px`;
-        node.labelEl.style.top = `${y}px`;
+        node.labelEl.style.left = `${sx}px`;
+        node.labelEl.style.top = `${sy}px`;
+
+        // 4. Render live moving 3D Three.js miniature mechanism inside the card's canvas next to the textarea
+        if (diagramTransition > 0.05 && node.miniGroup && node.miniCtx) {
+          node.miniAnimators.forEach(fn => fn(elapsed));
+          node.miniGroup.rotation.y = Math.sin(elapsed * 0.55 + idx) * 0.28;
+          node.miniGroup.visible = true;
+          miniRenderer.render(miniScene, miniCamera);
+          node.miniCtx.clearRect(0, 0, 128, 128);
+          node.miniCtx.drawImage(miniRenderer.domElement, 0, 0, 128, 128);
+          node.miniGroup.visible = false;
+        }
       });
+
+      // 5. Update SVG Schematic Connection Lines & Signal Packets
+      if (diagramTransition > 0.02 && diagramEdges.length > 0) {
+        diagramEdges.forEach((edge) => {
+          const nA = partNodes[edge.from];
+          const nB = partNodes[edge.to];
+          if (!nA || !nB) return;
+
+          const dx = nB.currentScreenX - nA.currentScreenX;
+          const dy = nB.currentScreenY - nA.currentScreenY;
+          const isLinkedToSelected = (edge.from === selectedIdx || edge.to === selectedIdx);
+
+          const portScale = 0.35 + 0.65 * diagramTransition;
+          const hwA = (nA.halfW || 110) * portScale;
+          const hhA = (nA.halfH || 48) * portScale;
+          const hwB = (nB.halfW || 110) * portScale;
+          const hhB = (nB.halfH || 48) * portScale;
+
+          let x1 = nA.currentScreenX;
+          let y1 = nA.currentScreenY;
+          let x2 = nB.currentScreenX;
+          let y2 = nB.currentScreenY;
+          let cx1, cy1, cx2, cy2;
+
+          if (Math.abs(dx) > Math.abs(dy) * 0.95) {
+            const signX = dx >= 0 ? 1 : -1;
+            x1 += signX * hwA;
+            x2 -= signX * hwB;
+            const bend = (x2 - x1) * 0.5;
+            cx1 = x1 + bend;
+            cy1 = y1;
+            cx2 = x2 - bend;
+            cy2 = y2;
+          } else {
+            const signY = dy >= 0 ? 1 : -1;
+            y1 += signY * hhA;
+            y2 -= signY * hhB;
+            const bend = (y2 - y1) * 0.5;
+            cx1 = x1;
+            cy1 = y1 + bend;
+            cx2 = x2;
+            cy2 = y2 - bend;
+          }
+
+          const d = `M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${cx1.toFixed(1)} ${cy1.toFixed(1)}, ${cx2.toFixed(1)} ${cy2.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+          edge.pathEl.setAttribute('d', d);
+          edge.pathEl.setAttribute('opacity', String(isLinkedToSelected ? 0.94 : (edge.primary ? 0.45 : 0.26)));
+          edge.pathEl.setAttribute('stroke-width', isLinkedToSelected ? '1.9' : (edge.primary ? '1.4' : '1.05'));
+
+          edge.portStartEl.setAttribute('x', String((x1 - 2.5).toFixed(1)));
+          edge.portStartEl.setAttribute('y', String((y1 - 2.5).toFixed(1)));
+          edge.portEndEl.setAttribute('x', String((x2 - 2.5).toFixed(1)));
+          edge.portEndEl.setAttribute('y', String((y2 - 2.5).toFixed(1)));
+
+          edge.t = (edge.t + edge.speed * (isLinkedToSelected ? 1.4 : 1.0)) % 1;
+          const px = evalCubicBezier(x1, cx1, cx2, x2, edge.t);
+          const py = evalCubicBezier(y1, cy1, cy2, y2, edge.t);
+          const pktSize = isLinkedToSelected ? 7 : (edge.primary ? 5.5 : 4.5);
+          edge.pktEl.setAttribute('width', String(pktSize));
+          edge.pktEl.setAttribute('height', String(pktSize));
+          edge.pktEl.setAttribute('x', String((px - pktSize * 0.5).toFixed(1)));
+          edge.pktEl.setAttribute('y', String((py - pktSize * 0.5).toFixed(1)));
+          edge.pktEl.setAttribute('opacity', isLinkedToSelected ? '1' : '0.72');
+
+          const mx = evalCubicBezier(x1, cx1, cx2, x2, 0.5);
+          const my = evalCubicBezier(y1, cy1, cy2, y2, 0.5);
+          edge.badgeEl.setAttribute('transform', `translate(${mx.toFixed(1)}, ${my.toFixed(1)})`);
+          edge.badgeEl.setAttribute('opacity', String(Math.max(0, (diagramTransition - 0.45) / 0.55) * (isLinkedToSelected ? 1 : 0.78)));
+          edge.badgeBgEl.setAttribute('stroke', isLinkedToSelected ? 'var(--border-strong)' : 'var(--border-hairline)');
+          edge.badgeTxtEl.setAttribute('fill', isLinkedToSelected ? 'var(--text-primary)' : 'var(--text-muted)');
+        });
+      }
     }
 
     function animate() {
       requestAnimationFrame(animate);
       const elapsed = clock.getElapsedTime();
 
-      activeAnimators.forEach(fn => fn(elapsed));
+      // Smoothly transition between 3D Machine (0) and 2D Diagram Mode (1)
+      const targetDiag = isDiagramMode ? 1 : 0;
+      if (Math.abs(targetDiag - diagramTransition) > 0.0005) {
+        diagramTransition += (targetDiag - diagramTransition) * 0.1;
+        if (Math.abs(targetDiag - diagramTransition) <= 0.001) {
+          diagramTransition = targetDiag;
+        }
+        updateSceneMachineOpacity(1 - diagramTransition);
+      }
+
+      const machineAlpha = 1 - diagramTransition;
+      if (machineAlpha > 0.01) {
+        activeAnimators.forEach(fn => fn(elapsed));
+      }
+
+      camTheta += (targetCamTheta - camTheta) * 0.09;
+      camPhi += (targetCamPhi - camPhi) * 0.09;
+      camRadius += (targetCamRadius - camRadius) * 0.09;
 
       camera.position.x = camTarget.x + camRadius * Math.sin(camPhi) * Math.sin(camTheta);
       camera.position.y = camTarget.y + camRadius * Math.cos(camPhi);
       camera.position.z = camTarget.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
       camera.lookAt(camTarget);
 
-      renderer.render(scene, camera);
-      updateLabels();
+      if (machineAlpha > 0.008) {
+        renderer.render(scene, camera);
+      } else {
+        renderer.clear();
+      }
+      updateLabels(elapsed);
     }
 
     window.addEventListener('resize', () => {
