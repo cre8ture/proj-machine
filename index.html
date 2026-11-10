@@ -247,14 +247,23 @@
       padding-top: 7px;
       border-top: 1px solid var(--border-hairline);
     }
-    body.diagram-mode .part-tag .diagram-mini-canvas {
+    .part-tag .diagram-part-3d-slot {
       width: 60px;
       height: 60px;
       flex-shrink: 0;
       border-radius: 4px;
-      border: 1px solid var(--border-hairline);
-      background: var(--bg-primary);
+      border: 1px dashed var(--border-hairline);
+      background: rgba(128, 128, 128, 0.05);
+      display: none;
+      position: relative;
+    }
+    body.diagram-mode .part-tag .diagram-part-3d-slot {
       display: block;
+    }
+    body.diagram-mode #webgl-canvas {
+      position: relative;
+      z-index: 30;
+      pointer-events: none;
     }
     body.diagram-mode .part-tag .diagram-part-notes {
       flex: 1;
@@ -693,12 +702,12 @@
     const btnReturnMachine = document.getElementById('btn-return-machine');
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d0d0c);
     scene.fog = new THREE.FogExp2(0x0d0d0c, 0.022);
 
     const camera = new THREE.PerspectiveCamera(36, window.innerWidth / window.innerHeight, 0.1, 200);
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setClearColor(0x000000, 0);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -717,25 +726,6 @@
     const backLight = new THREE.DirectionalLight(0xffffff, 0.35);
     backLight.position.set(-14, 10, -12);
     scene.add(backLight);
-
-    // Offscreen Miniature 3D Renderer for Live Moving 3D Components inside Diagram Cards
-    const miniScene = new THREE.Scene();
-    const miniCamera = new THREE.PerspectiveCamera(34, 1, 0.1, 40);
-    miniCamera.position.set(2.55, 1.85, 2.95);
-    miniCamera.lookAt(0, 0.05, 0);
-
-    const miniRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    miniRenderer.setSize(128, 128);
-    miniRenderer.setPixelRatio(1);
-
-    const miniAmbient = new THREE.AmbientLight(0xffffff, 0.85);
-    miniScene.add(miniAmbient);
-    const miniDir = new THREE.DirectionalLight(0xffffff, 0.88);
-    miniDir.position.set(6, 10, 8);
-    miniScene.add(miniDir);
-
-    const miniRoot = new THREE.Group();
-    miniScene.add(miniRoot);
 
     // Invisible Raycast Floor Plane for clicking empty grid locations & dragging parts
     const floorHitPlane = new THREE.Mesh(
@@ -823,21 +813,27 @@
 
     function updateSceneMachineOpacity(alpha) {
       const a = Math.max(0, Math.min(1, alpha));
-      machineRoot.traverse((obj) => {
-        if (obj.material && obj !== floorHitPlane && (!obj.userData || obj.userData.partIndex === undefined)) {
-          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          mats.forEach((m) => {
-            m.transparent = true;
-            if (obj.isLineSegments) {
-              const baseOp = (m.userData && m.userData.baseEdgeOpacity) ? m.userData.baseEdgeOpacity : (isWireframe ? 0.85 : 0.55);
-              m.opacity = baseOp * a;
-            } else {
-              m.opacity = a;
-              m.depthWrite = a > 0.18;
-            }
-          });
-        }
+      const visible = a > 0.008;
+      machineRoot.children.forEach((child) => {
+        if (child.userData && child.userData.isComponentGroup) return;
+        child.visible = visible;
+        child.traverse((obj) => {
+          if (obj.material && obj !== floorHitPlane) {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            mats.forEach((m) => {
+              m.transparent = true;
+              if (obj.isLineSegments) {
+                const baseOp = (m.userData && m.userData.baseEdgeOpacity) ? m.userData.baseEdgeOpacity : (isWireframe ? 0.85 : 0.55);
+                m.opacity = baseOp * a;
+              } else {
+                m.opacity = a;
+                m.depthWrite = a > 0.18;
+              }
+            });
+          }
+        });
       });
+      floorGroup.visible = visible;
       floorGroup.traverse((obj) => {
         if (obj.material) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
@@ -1149,16 +1145,13 @@
       while (machineRoot.children.length > 0) {
         machineRoot.remove(machineRoot.children[0]);
       }
-      while (miniRoot.children.length > 0) {
-        miniRoot.remove(miniRoot.children[0]);
-      }
       labelsLayer.innerHTML = '';
       activeAnimators = [];
       partNodes = [];
 
       if (machineParts.length === 0) return;
 
-      const frameMats = createPartMaterials(null, false);
+      const frameMats = createPartMaterials(null, false, false);
 
       // Compute Spanning Tree + Secondary Loop Connections first so cards know their linked peers
       const primaryEdges = [];
@@ -1203,19 +1196,20 @@
 
       buildDiagramSvgConnections(primaryEdges, secondaryEdges);
 
-      // 1. Place each component at its (x, z) coordinate & build its live 3D miniature for Diagram Mode
+      // 1. Place each component at its (x, z) coordinate (kept at full opacity so it breaks apart & miniaturizes into its card slot in Diagram Mode)
       machineParts.forEach((part, idx) => {
         if (typeof part.x !== 'number' || typeof part.z !== 'number') {
           layoutCluster2D(machineParts);
         }
 
         const isSel = idx === selectedIdx && !isViewerOnly;
-        const mats = createPartMaterials(part.color, isSel);
+        const mats = createPartMaterials(part.color, isSel, true);
         const built = createMechanismMesh(part.type, mats, idx);
 
+        built.group.userData.isComponentGroup = true;
         built.group.position.set(part.x, 0, part.z);
 
-        // Support pedestal to floor
+        // Support pedestal to floor (fades away in Diagram Mode)
         const pedestal = makeMesh(new THREE.BoxGeometry(0.75, 0.9, 0.75), frameMats.secondary, frameMats.edge);
         pedestal.position.set(part.x, -0.95, part.z);
         machineRoot.add(pedestal);
@@ -1231,12 +1225,6 @@
         machineRoot.add(built.group);
         activeAnimators.push(...built.animators);
 
-        // Build dedicated full-opacity 3D miniature replica of this exact mechanism for its Diagram Card
-        const miniMats = createPartMaterials(part.color, isSel, true);
-        const miniBuilt = createMechanismMesh(part.type, miniMats, idx);
-        miniBuilt.group.visible = false;
-        miniRoot.add(miniBuilt.group);
-
         // Connected peer badges for diagram card footer
         const peers = [];
         primaryEdges.forEach(([a, b]) => {
@@ -1250,7 +1238,7 @@
           part.notes = defaultNote;
         }
 
-        // Hybrid 3D Floating Tag / 2D Schematic Component Card (with Live Moving 3D Preview + Textarea)
+        // Hybrid 3D Floating Tag / 2D Schematic Component Card (with 3D Component Slot + Textarea)
         const tag = document.createElement('div');
         tag.className = `part-tag ${isSel ? 'selected' : ''}`;
         const dotColor = part.color || (isDarkPolarity ? '#f0efeb' : '#141413');
@@ -1265,7 +1253,7 @@
             <span class="diagram-type-badge">${part.type.toUpperCase()}</span>
           </div>
           <div class="diagram-card-body">
-            <canvas class="diagram-mini-canvas" width="128" height="128" title="Live 3D ${part.type} mechanism"></canvas>
+            <div class="diagram-part-3d-slot" title="Live 3D ${part.type} mechanism"></div>
             <textarea class="diagram-part-notes" rows="3" ${isViewerOnly ? 'readonly' : ''} placeholder="Component spec or notes..."></textarea>
           </div>
           <div class="diagram-card-footer">
@@ -1285,8 +1273,7 @@
           });
         }
 
-        const miniCanvasEl = tag.querySelector('.diagram-mini-canvas');
-        const miniCtx = miniCanvasEl ? miniCanvasEl.getContext('2d') : null;
+        const slotEl = tag.querySelector('.diagram-part-3d-slot');
 
         // Support dragging component cards in Diagram Mode & clicking to open builder popup
         let cardDragStart = null;
@@ -1341,9 +1328,7 @@
           group: built.group,
           hitMesh: hitBox,
           labelEl: tag,
-          miniGroup: miniBuilt.group,
-          miniAnimators: miniBuilt.animators,
-          miniCtx,
+          slotEl,
           currentScreenX: window.innerWidth / 2,
           currentScreenY: window.innerHeight / 2,
           halfW: 110,
@@ -1742,7 +1727,6 @@
       btnTheme.classList.toggle('active', isDarkPolarity);
       btnTheme.textContent = isDarkPolarity ? 'DARK' : 'LIGHT';
       const bgHex = isDarkPolarity ? 0x0d0d0c : 0xf2f1ed;
-      scene.background.setHex(bgHex);
       scene.fog.color.setHex(bgHex);
       rebuildFloor();
       rebuildMachine3D();
@@ -2075,11 +2059,13 @@
       const w = window.innerWidth;
       const h = window.innerHeight;
       const total = partNodes.length;
+      const refNdc = camTarget.clone().project(camera);
 
       partNodes.forEach((node, idx) => {
         const part = machineParts[idx];
-        node.group.getWorldPosition(projVec);
-        projVec.y += 1.45;
+        const homeX = part ? part.x : 0;
+        const homeZ = part ? part.z : 0;
+        projVec.set(homeX, 1.45, homeZ);
         projVec.project(camera);
 
         const cardW = node.labelEl.offsetWidth || (isDiagramMode ? 248 : 130);
@@ -2109,21 +2095,34 @@
 
         if (projVec.z > 1 && diagramTransition < 0.05) {
           node.labelEl.style.display = 'none';
-          return;
+        } else {
+          node.labelEl.style.display = 'inline-flex';
+          node.labelEl.style.left = `${sx}px`;
+          node.labelEl.style.top = `${sy}px`;
         }
-        node.labelEl.style.display = 'inline-flex';
-        node.labelEl.style.left = `${sx}px`;
-        node.labelEl.style.top = `${sy}px`;
 
-        // 4. Render live moving 3D Three.js miniature mechanism inside the card's canvas next to the textarea
-        if (diagramTransition > 0.05 && node.miniGroup && node.miniCtx) {
-          node.miniAnimators.forEach(fn => fn(elapsed));
-          node.miniGroup.rotation.y = Math.sin(elapsed * 0.55 + idx) * 0.28;
-          node.miniGroup.visible = true;
-          miniRenderer.render(miniScene, miniCamera);
-          node.miniCtx.clearRect(0, 0, 128, 128);
-          node.miniCtx.drawImage(miniRenderer.domElement, 0, 0, 128, 128);
-          node.miniGroup.visible = false;
+        // 4. Break apart & miniaturize the actual 3D component mechanism into its card's 3D slot
+        if (node.group && w > 0 && h > 0) {
+          let slotX = sx - cardW * 0.34;
+          let slotY = sy + 6;
+          if (node.slotEl && diagramTransition > 0.15) {
+            const sRect = node.slotEl.getBoundingClientRect();
+            if (sRect.width > 8) {
+              slotX = sRect.left + sRect.width * 0.5;
+              slotY = sRect.top + sRect.height * 0.5;
+            }
+          }
+          const ndcX = (slotX / w) * 2 - 1;
+          const ndcY = -(slotY / h) * 2 + 1;
+          const targetWorld = new THREE.Vector3(ndcX, ndcY, refNdc.z).unproject(camera);
+
+          const homePos = new THREE.Vector3(homeX, 0, homeZ);
+          node.group.position.copy(homePos).lerp(targetWorld, diagramTransition);
+
+          const s = 1 - 0.72 * diagramTransition; // Miniaturizes to 28% scale inside the card slot
+          node.group.scale.setScalar(s);
+          node.group.rotation.x = 0.32 * diagramTransition;
+          node.group.rotation.y = Math.sin(elapsed * 0.55 + idx) * 0.28 * diagramTransition;
         }
       });
 
@@ -2214,10 +2213,7 @@
         updateSceneMachineOpacity(1 - diagramTransition);
       }
 
-      const machineAlpha = 1 - diagramTransition;
-      if (machineAlpha > 0.01) {
-        activeAnimators.forEach(fn => fn(elapsed));
-      }
+      activeAnimators.forEach(fn => fn(elapsed));
 
       camTheta += (targetCamTheta - camTheta) * 0.09;
       camPhi += (targetCamPhi - camPhi) * 0.09;
@@ -2227,13 +2223,10 @@
       camera.position.y = camTarget.y + camRadius * Math.cos(camPhi);
       camera.position.z = camTarget.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
       camera.lookAt(camTarget);
+      camera.updateMatrixWorld();
 
-      if (machineAlpha > 0.008) {
-        renderer.render(scene, camera);
-      } else {
-        renderer.clear();
-      }
       updateLabels(elapsed);
+      renderer.render(scene, camera);
     }
 
     window.addEventListener('resize', () => {
