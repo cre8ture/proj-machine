@@ -1206,6 +1206,14 @@
         const mats = createPartMaterials(part.color, isSel, true);
         const built = createMechanismMesh(part.type, mats, idx);
 
+        // Compute true local bounding center & span before adding the invisible hitBox
+        const partBox = new THREE.Box3().setFromObject(built.group);
+        const localCenter = new THREE.Vector3();
+        const partSize = new THREE.Vector3();
+        partBox.getCenter(localCenter);
+        partBox.getSize(partSize);
+        const boundSpan = Math.max(1.2, partSize.length());
+
         built.group.userData.isComponentGroup = true;
         built.group.position.set(part.x, 0, part.z);
 
@@ -1329,6 +1337,8 @@
           hitMesh: hitBox,
           labelEl: tag,
           slotEl,
+          localCenter,
+          boundSpan,
           currentScreenX: window.innerWidth / 2,
           currentScreenY: window.innerHeight / 2,
           halfW: 110,
@@ -2060,6 +2070,8 @@
       const h = window.innerHeight;
       const total = partNodes.length;
       const refNdc = camTarget.clone().project(camera);
+      const vFovRad = (camera.fov * Math.PI) / 180;
+      const worldPerPixel = h > 0 ? (2 * camRadius * Math.tan(vFovRad * 0.5)) / h : 0.01;
 
       partNodes.forEach((node, idx) => {
         const part = machineParts[idx];
@@ -2102,25 +2114,39 @@
         }
 
         // 4. Break apart & miniaturize the actual 3D component mechanism into its card's 3D slot
+        node.slotClipRect = null;
         if (node.group && w > 0 && h > 0) {
-          let slotX = sx - cardW * 0.34;
+          let slotX = sx - cardW * 0.35;
           let slotY = sy + 6;
           if (node.slotEl && diagramTransition > 0.15) {
             const sRect = node.slotEl.getBoundingClientRect();
             if (sRect.width > 8) {
               slotX = sRect.left + sRect.width * 0.5;
               slotY = sRect.top + sRect.height * 0.5;
+              node.slotClipRect = {
+                x: Math.max(0, sRect.left),
+                y: Math.max(0, h - sRect.bottom),
+                w: Math.max(0, sRect.width),
+                h: Math.max(0, sRect.height)
+              };
             }
           }
           const ndcX = (slotX / w) * 2 - 1;
           const ndcY = -(slotY / h) * 2 + 1;
           const targetWorld = new THREE.Vector3(ndcX, ndcY, refNdc.z).unproject(camera);
 
+          const span = node.boundSpan || 2.4;
+          const sMini = Math.min(0.24, (40 * worldPerPixel) / span);
+          const s = 1 + (sMini - 1) * diagramTransition;
+          node.group.scale.setScalar(s);
+
+          // Center the mechanism's local bounding box inside the slot
+          const locCenter = node.localCenter || new THREE.Vector3(0, 0.2, 0);
+          targetWorld.addScaledVector(locCenter, -s);
+
           const homePos = new THREE.Vector3(homeX, 0, homeZ);
           node.group.position.copy(homePos).lerp(targetWorld, diagramTransition);
 
-          const s = 1 - 0.72 * diagramTransition; // Miniaturizes to 28% scale inside the card slot
-          node.group.scale.setScalar(s);
           node.group.rotation.x = 0.32 * diagramTransition;
           node.group.rotation.y = Math.sin(elapsed * 0.55 + idx) * 0.28 * diagramTransition;
         }
@@ -2226,6 +2252,31 @@
       camera.updateMatrixWorld();
 
       updateLabels(elapsed);
+
+      // Clip docked 3D mechanisms strictly to their .diagram-part-3d-slot box so they never cover card text
+      if (diagramTransition > 0.85 && partNodes.length > 0) {
+        renderer.autoClear = false;
+        renderer.setScissorTest(false);
+        renderer.clear();
+        renderer.setScissorTest(true);
+        partNodes.forEach(node => {
+          if (!node.group || !node.slotClipRect) return;
+          partNodes.forEach(other => {
+            if (other.group) other.group.visible = (other === node);
+          });
+          const r = node.slotClipRect;
+          renderer.setScissor(r.x, r.y, r.w, r.h);
+          renderer.render(scene, camera);
+        });
+        partNodes.forEach(other => {
+          if (other.group) other.group.visible = true;
+        });
+        renderer.setScissorTest(false);
+        renderer.autoClear = true;
+        return;
+      }
+
+      renderer.setScissorTest(false);
       renderer.render(scene, camera);
     }
 
