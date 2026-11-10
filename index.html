@@ -352,6 +352,57 @@
       border-color: var(--border-strong);
     }
 
+    /* Architectural Mode Toggle Switch (MACHINE <-> DIAGRAM) */
+    .cad-mode-switch {
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 9.5px;
+      letter-spacing: 0.04em;
+      padding: 4.5px 9px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: border-color 0.14s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cad-mode-switch:hover {
+      border-color: var(--border-strong);
+    }
+    .cad-mode-switch .switch-label {
+      color: var(--text-muted);
+      transition: color 0.18s ease, font-weight 0.18s ease;
+    }
+    .cad-mode-switch:not(.is-diagram) .switch-label-machine,
+    .cad-mode-switch.is-diagram .switch-label-diagram {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .cad-mode-switch .switch-track {
+      position: relative;
+      width: 22px;
+      height: 11px;
+      border: 1px solid var(--border-strong);
+      border-radius: 9999px;
+      background: var(--bg-primary);
+      flex-shrink: 0;
+    }
+    .cad-mode-switch .switch-thumb {
+      position: absolute;
+      top: 1.5px;
+      left: 1.5px;
+      width: 6px;
+      height: 6px;
+      border-radius: 9999px;
+      background: var(--text-primary);
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .cad-mode-switch.is-diagram .switch-thumb {
+      transform: translateX(11px);
+    }
+
     .swatch {
       width: 16px;
       height: 16px;
@@ -419,7 +470,11 @@
 
     <!-- Right: View & Export Actions -->
     <div class="flex items-center gap-1.5 pointer-events-auto">
-      <button id="btn-diagram" class="pill-btn" title="Toggle Schematic Diagram Mode (D)">◇ DIAGRAM</button>
+      <button id="btn-diagram" type="button" role="switch" aria-checked="false" class="cad-mode-switch" title="Switch between 3D Machine and Schematic Diagram (D)">
+        <span class="switch-label switch-label-machine">MACHINE</span>
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label switch-label-diagram">DIAGRAM</span>
+      </button>
       <button id="btn-wireframe" class="pill-btn active" title="Toggle X-Ray Blueprint">X-RAY</button>
       <button id="btn-theme" class="pill-btn active" title="Toggle Dark / Light Mode">DARK</button>
       <button id="btn-download-html" class="pill-btn builder-ui" title="Download standalone viewer HTML">↓ DOWNLOAD</button>
@@ -434,7 +489,7 @@
     <span id="diagram-topology-label" class="font-mono-tech text-[9.5px] uppercase tracking-wider" style="color: var(--text-secondary);">
       SCHEMATIC DIAGRAM · LIVE 3D PARTS
     </span>
-    <button id="btn-return-machine" type="button" class="pill-btn active py-0.5 px-2 text-[9px]" title="Animate back to 3D Machine (Esc)">
+    <button id="btn-return-machine" type="button" class="pill-btn py-0.5 px-2 text-[9px]" title="Animate back to 3D Machine (Esc)">
       ← 3D MACHINE
     </button>
   </div>
@@ -1679,8 +1734,8 @@
       }
 
       if (btnDiagram) {
-        btnDiagram.classList.toggle('active', isDiagramMode);
-        btnDiagram.textContent = isDiagramMode ? '← 3D MACHINE' : '◇ DIAGRAM';
+        btnDiagram.classList.toggle('is-diagram', isDiagramMode);
+        btnDiagram.setAttribute('aria-checked', String(isDiagramMode));
       }
       if (diagramStageBanner) {
         diagramStageBanner.classList.toggle('hidden', !isDiagramMode);
