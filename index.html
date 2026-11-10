@@ -1932,7 +1932,7 @@
       document.getElementById('machine-title').textContent = machineTitle;
 
       machineParts = chosen.map((line, idx) => {
-        // Split only on ':' or spaced dashes (' — ', ' – ', ' - ') so hyphenated names like 'tool-registry' or 'agent-core' stay intact
+        // Split only on ':' or spaced dashes (' — ', ' – ', ' - ') so hyphenated module names stay intact
         const sepParts = line.split(/\s*:\s*|\s+[—–-]\s+/);
         const rawTitle = (sepParts[0] || line).trim();
         const cleanName = rawTitle.slice(0, 46);
